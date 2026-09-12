@@ -13,7 +13,7 @@
     </thead>
     <tbody>
       <tr v-for="c in competitions" :key="c.id">
-        <td>{{ c.code }}</td>
+        <td><span class="league-badge" :style="{ '--league-color': leagueColor(c.code) }">{{ c.code }}</span></td>
         <td>{{ c.name }}</td>
         <td>{{ c.type === 'REGIONAL_LEAGUE' ? 'Ligue régionale' : 'Événement international' }}</td>
         <td>{{ c.season }}</td>
@@ -41,6 +41,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import api from '../services/api'
+import { leagueColor } from '../leagueColors'
 
 const competitions = ref([])
 const loaded = ref(false)
@@ -74,3 +75,17 @@ async function submit() {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.league-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85em;
+  letter-spacing: 0.03em;
+  color: var(--league-color);
+  background: color-mix(in srgb, var(--league-color) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--league-color) 45%, transparent);
+}
+</style>

@@ -24,9 +24,9 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="m in sortedMatches" :key="m.id">
+        <tr v-for="m in sortedMatches" :key="m.id" :style="{ '--league-color': leagueColor(m.competitionCode) }">
           <td>
-            <router-link :to="`/competitions/${m.competitionId}`" class="competition-link">{{ m.competitionCode }}</router-link>
+            <router-link :to="`/competitions/${m.competitionId}`" class="competition-link league-badge">{{ m.competitionCode }}</router-link>
           </td>
           <td><input class="date-input" type="date" v-model="edits[m.id].date" /></td>
           <td><input class="time-input" type="time" v-model="edits[m.id].time" /></td>
@@ -79,6 +79,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import api, { teamLogoUrl } from '../services/api'
+import { leagueColor } from '../leagueColors'
 
 const matches = ref([])
 const teams = ref([])
@@ -204,8 +205,11 @@ onMounted(load)
 }
 .table-scroll th,
 .table-scroll td {
-  padding: 6px 6px;
-  font-size: 0.92em;
+  padding: 12px 10px;
+  font-size: 0.95em;
+}
+.table-scroll tbody tr {
+  border-left: 3px solid var(--league-color);
 }
 .sortable {
   cursor: pointer;
@@ -217,38 +221,53 @@ onMounted(load)
 .sort-arrow {
   font-size: 0.9em;
 }
-.competition-link {
+.competition-link.league-badge {
+  display: inline-block;
   font-weight: 700;
-  color: var(--gold);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.85em;
+  letter-spacing: 0.03em;
+  color: var(--league-color);
+  background: color-mix(in srgb, var(--league-color) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--league-color) 45%, transparent);
+}
+.competition-link.league-badge:hover {
+  color: var(--league-color);
+  filter: brightness(1.2);
 }
 .date-input {
-  width: 118px;
-  padding: 6px 4px;
+  width: 130px;
+  padding: 9px 6px;
 }
 .time-input {
-  width: 76px;
-  padding: 6px 4px;
+  width: 84px;
+  padding: 9px 6px;
 }
 .round-input {
-  width: 60px;
-  padding: 6px 4px;
+  width: 70px;
+  padding: 9px 6px;
 }
 .table-scroll select {
-  padding: 6px 4px;
+  padding: 9px 6px;
 }
 .team-cell {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   white-space: nowrap;
 }
 .team-cell select {
-  width: 78px;
+  width: 88px;
 }
 .table-scroll .team-logo {
-  height: 20px;
-  max-width: 30px;
+  height: 24px;
+  max-width: 34px;
   padding: 2px;
+}
+.table-scroll .score-input {
+  width: 56px;
+  padding: 9px 6px;
 }
 .empty {
   padding: 24px 0;
