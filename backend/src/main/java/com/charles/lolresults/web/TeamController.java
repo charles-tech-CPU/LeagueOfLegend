@@ -10,7 +10,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
 
@@ -72,5 +74,15 @@ public class TeamController {
                 ? MediaType.parseMediaType(team.getLogoContentType())
                 : MediaType.APPLICATION_OCTET_STREAM;
         return ResponseEntity.ok().contentType(contentType).body(team.getLogo());
+    }
+
+    @PostMapping("/{id}/logo")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void uploadLogo(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
+        Team team = teamRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Equipe introuvable : " + id));
+        team.setLogo(file.getBytes());
+        team.setLogoContentType(file.getContentType());
+        teamRepository.save(team);
     }
 }

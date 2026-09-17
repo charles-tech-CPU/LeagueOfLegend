@@ -32,8 +32,8 @@ export default {
   deleteMatch: (id) => api.delete(`/matches/${id}`),
 
   // Classement / tete-a-tete (calcules cote backend, jamais stockes)
-  getStandings: (competitionId) =>
-    api.get('/standings', { params: { competitionId } }).then(r => r.data),
-  getHeadToHead: (competitionId) =>
-    api.get('/head-to-head', { params: { competitionId } }).then(r => r.data)
+  getStandings: (competitionId, groupId) =>
+    api.get('/standings', { params: { competitionId, groupId } }).then(r => r.data),
+  getHeadToHead: (competitionId, groupId) =>
+    api.get('/head-to-head', { params: { competitionId, groupId } }).then(r => r.data)
 }

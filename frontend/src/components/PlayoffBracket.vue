@@ -2,7 +2,47 @@
   <div v-if="matches.length" class="bracket">
     <div v-for="side in sides" :key="side.key" class="bracket-side">
       <h3>{{ side.label }}</h3>
-      <div class="bracket-rounds">
+
+      <div v-if="side.isTable" class="side-table-scroll">
+        <table class="side-table">
+          <thead>
+            <tr>
+              <th>Round</th>
+              <th>Date</th>
+              <th>Équipe 1</th>
+              <th></th>
+              <th>Équipe 2</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="m in side.flatMatches" :key="m.id">
+              <td class="round-cell">{{ m.roundLabel }}</td>
+              <td class="date-cell">{{ m.date }}</td>
+              <td class="team-cell" :class="{ winner: isWinner(m, 1) }">
+                <img v-if="m.team1HasLogo" class="team-logo" :src="teamLogoUrl(m.team1Id)" :alt="m.team1Code" />
+                <span>{{ m.team1Code ?? 'À déterminer' }}</span>
+              </td>
+              <td class="score-cell">
+                <span :class="{ winner: isWinner(m, 1) }">{{ m.score1 ?? '–' }}</span>
+                <span class="score-sep">-</span>
+                <span :class="{ winner: isWinner(m, 2) }">{{ m.score2 ?? '–' }}</span>
+              </td>
+              <td class="team-cell" :class="{ winner: isWinner(m, 2) }">
+                <img v-if="m.team2HasLogo" class="team-logo" :src="teamLogoUrl(m.team2Id)" :alt="m.team2Code" />
+                <span>{{ m.team2Code ?? 'À déterminer' }}</span>
+              </td>
+              <td>
+                <span class="status-badge" :class="m.status === 'COMPLETED' ? 'completed' : 'scheduled'">
+                  {{ m.status === 'COMPLETED' ? 'Joué' : 'À venir' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-else class="bracket-rounds">
         <div v-for="col in side.rounds" :key="col.roundLabel" class="bracket-round">
           <div class="round-title">{{ col.roundLabel }}</div>
           <div v-for="m in col.matches" :key="m.id" class="bracket-match">
@@ -38,14 +78,23 @@ const SIDE_LABELS = {
   GROUP: 'Poules',
   SWISS_STAGE: 'Phase suisse',
   SEEDING: 'Seeding',
+  PLACEMENT: 'Match de classement',
   PLAY_IN: 'Play-in',
   BRACKET: 'Bracket',
   UPPER: 'Bracket vainqueurs',
   LOWER: 'Bracket perdants',
   GRAND_FINAL: 'Grande finale',
+  REGIONAL_UPPER: 'Bracket vainqueurs',
+  REGIONAL_LOWER: 'Bracket perdants',
   AUTRE: 'Playoffs'
 }
-const SIDE_ORDER = ['GROUP', 'SWISS_STAGE', 'SEEDING', 'PLAY_IN', 'BRACKET', 'UPPER', 'LOWER', 'GRAND_FINAL']
+const SIDE_ORDER = ['GROUP', 'SWISS_STAGE', 'PLACEMENT', 'SEEDING', 'PLAY_IN', 'BRACKET', 'UPPER', 'LOWER', 'GRAND_FINAL', 'REGIONAL_UPPER', 'REGIONAL_LOWER']
+
+// Cotes sans arbre d'avancement (poules, phase suisse, seeding, classement) :
+// l'affichage en colonnes horizontales par round n'a de sens que pour un
+// vrai bracket a elimination (UPPER/LOWER/GRAND_FINAL/PLAY_IN/...). Ailleurs,
+// un simple tableau qui descend se lit bien mieux (moins large, chronologique).
+const TABLE_SIDES = new Set(['GROUP', 'SWISS_STAGE', 'SEEDING', 'PLACEMENT'])
 
 function teamHasLogoLookup(teams) {
   const byId = new Map(teams.map(t => [t.id, t.hasLogo]))
@@ -79,6 +128,13 @@ const sides = computed(() => {
 
   return sideKeys.map(key => {
     const sideMatches = sideGroups.get(key)
+    const isTable = TABLE_SIDES.has(key)
+
+    if (isTable) {
+      const flatMatches = [...sideMatches].sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))
+      return { key, label: SIDE_LABELS[key] ?? key, isTable, flatMatches }
+    }
+
     const roundGroups = new Map()
     for (const m of sideMatches) {
       if (!roundGroups.has(m.roundLabel)) roundGroups.set(m.roundLabel, [])
@@ -92,7 +148,7 @@ const sides = computed(() => {
       }))
       .sort((a, b) => a.minDate.localeCompare(b.minDate))
 
-    return { key, label: SIDE_LABELS[key] ?? key, rounds }
+    return { key, label: SIDE_LABELS[key] ?? key, isTable, rounds }
   })
 })
 
@@ -179,5 +235,76 @@ function isWinner(match, slot) {
   margin-top: 6px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+.side-table-scroll {
+  overflow-x: auto;
+}
+.side-table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 640px;
+}
+.side-table th,
+.side-table td {
+  padding: 8px 10px;
+  font-size: 0.88em;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.side-table th {
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.72em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.round-cell {
+  color: var(--text-muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.date-cell {
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.side-table .team-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.side-table .team-cell.winner {
+  font-weight: 700;
+  color: var(--gold-bright);
+}
+.side-table .score-cell {
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.side-table .score-cell .winner {
+  color: var(--gold-bright);
+}
+.score-sep {
+  color: var(--text-dim);
+  margin: 0 4px;
+}
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.status-badge.completed {
+  color: #7fe0a0;
+  background: rgba(63, 185, 110, 0.16);
+}
+.status-badge.scheduled {
+  color: var(--text-muted);
+  background: rgba(200, 170, 110, 0.12);
 }
 </style>

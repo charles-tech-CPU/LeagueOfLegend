@@ -8,17 +8,42 @@
   <div class="tabs">
     <button type="button" :class="{ active: activeTab === 'standings' }" @click="activeTab = 'standings'">Classement</button>
     <button type="button" :class="{ active: activeTab === 'bracket' }" @click="activeTab = 'bracket'">Bracket</button>
+    <button v-if="regionalFinalsMatches.length" type="button" :class="{ active: activeTab === 'regionalFinals' }" @click="activeTab = 'regionalFinals'">Regional Finals</button>
+    <button type="button" :class="{ active: activeTab === 'h2h' }" @click="activeTab = 'h2h'">Confrontations</button>
     <button type="button" :class="{ active: activeTab === 'calendar' }" @click="activeTab = 'calendar'">Calendrier</button>
   </div>
 
   <section v-if="activeTab === 'standings'">
-    <h2>Classement (saison régulière)</h2>
-    <StandingsTable :rows="standings" />
+    <h2>Classement</h2>
+    <div class="group-panels">
+      <div v-for="p in standingsPanels" :key="p.key" class="group-panel">
+        <h3 v-if="p.name">{{ p.name }}</h3>
+        <StandingsTable :rows="p.rows" />
+      </div>
+    </div>
+  </section>
+
+  <section v-if="activeTab === 'h2h'">
+    <h2>Confrontations directes</h2>
+    <div v-for="g in groupedData" :key="g.id ?? 'all'" class="group-block">
+      <h3 v-if="g.name">{{ g.name }}</h3>
+      <div class="group-panels">
+        <div v-for="(legCells, legIndex) in g.legs" :key="legIndex" class="group-panel">
+          <h4 v-if="g.legs.length > 1">{{ legLabel(legIndex) }}</h4>
+          <HeadToHeadTable :rows="g.standings" :cells="legCells" />
+        </div>
+      </div>
+    </div>
   </section>
 
   <section v-if="activeTab === 'bracket'">
     <h2>Playoffs</h2>
     <PlayoffBracket :matches="playoffMatches" :teams="teams" />
+  </section>
+
+  <section v-if="activeTab === 'regionalFinals'">
+    <h2>Regional Finals</h2>
+    <PlayoffBracket :matches="regionalFinalsMatches" :teams="teams" />
   </section>
 
   <section v-if="activeTab === 'calendar'">
@@ -162,6 +187,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import api, { teamLogoUrl } from '../services/api'
 import StandingsTable from '../components/StandingsTable.vue'
+import HeadToHeadTable from '../components/HeadToHeadTable.vue'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
 import { leagueColor } from '../leagueColors'
 
@@ -171,7 +197,7 @@ const props = defineProps({
 
 const competition = ref(null)
 const matches = ref([])
-const standings = ref([])
+const groupedData = ref([])
 const teams = ref([])
 const loaded = ref(false)
 const error = ref('')
@@ -179,7 +205,8 @@ const edits = reactive({})
 const activeTab = ref('standings')
 const dateSortDir = ref('asc')
 
-const playoffMatches = computed(() => matches.value.filter(m => m.phase === 'PLAYOFFS'))
+const playoffMatches = computed(() => matches.value.filter(m => m.phase === 'PLAYOFFS' && !(m.bracketSide ?? '').startsWith('REGIONAL_')))
+const regionalFinalsMatches = computed(() => matches.value.filter(m => (m.bracketSide ?? '').startsWith('REGIONAL_')))
 
 const sortedMatches = computed(() => {
   const list = [...matches.value]
@@ -225,18 +252,129 @@ function emptyNewMatch() {
 
 const newMatch = reactive(emptyNewMatch())
 
+/**
+ * Regroupe les matchs termines par paire d'equipes (dans l'ordre chronologique)
+ * et construit, pour chaque manche (1ere confrontation, 2eme confrontation...),
+ * la liste de cellules { teamAId, teamBId, score } ou "score" est le score
+ * exact de CETTE manche du point de vue de teamA (ex: "2-1"), pas un bilan
+ * agrege : demande explicite d'afficher les series comme au foot (aller/retour).
+ */
+function buildLegCells(groupMatches) {
+  const pairs = new Map()
+  for (const m of groupMatches) {
+    if (m.status !== 'COMPLETED' || m.team1Id == null || m.team2Id == null) continue
+    const key = [m.team1Id, m.team2Id].sort((a, b) => a - b).join(':')
+    if (!pairs.has(key)) pairs.set(key, [])
+    pairs.get(key).push(m)
+  }
+  for (const arr of pairs.values()) {
+    arr.sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))
+  }
+  const maxLegs = Math.max(0, ...[...pairs.values()].map(arr => arr.length))
+  const legs = []
+  for (let i = 0; i < maxLegs; i++) {
+    const cells = []
+    for (const arr of pairs.values()) {
+      const m = arr[i]
+      if (!m) continue
+      cells.push({ teamAId: m.team1Id, teamBId: m.team2Id, score: `${m.score1}-${m.score2}` })
+      cells.push({ teamAId: m.team2Id, teamBId: m.team1Id, score: `${m.score2}-${m.score1}` })
+    }
+    legs.push(cells)
+  }
+  return legs
+}
+
+function legLabel(index) {
+  return index === 0 ? 'Match aller' : index === 1 ? 'Match retour' : `Manche ${index + 1}`
+}
+
+/**
+ * Classement calcule cote client pour les competitions sans vraie saison
+ * reguliere (LCP : phase suisse modelisee en phase=PLAYOFFS, voir V5) : a
+ * defaut, /api/standings renvoie une liste vide. On retallie a partir des
+ * matchs bracketSide='SWISS_STAGE' pour donner un classement quand meme.
+ */
+function computeSwissStandings(swissMatches, teamList) {
+  const teamById = new Map(teamList.map(t => [t.id, t]))
+  const tally = new Map()
+  function ensure(id) {
+    if (!tally.has(id)) {
+      const t = teamById.get(id)
+      tally.set(id, {
+        teamId: id,
+        teamCode: t?.code ?? '?',
+        teamName: t?.name ?? '?',
+        teamHasLogo: t?.hasLogo ?? false,
+        seriesWon: 0,
+        seriesLost: 0,
+        gamesWon: 0,
+        gamesLost: 0
+      })
+    }
+    return tally.get(id)
+  }
+  for (const m of swissMatches) {
+    if (m.status !== 'COMPLETED' || m.team1Id == null || m.team2Id == null) continue
+    const a = ensure(m.team1Id)
+    const b = ensure(m.team2Id)
+    a.gamesWon += m.score1
+    a.gamesLost += m.score2
+    b.gamesWon += m.score2
+    b.gamesLost += m.score1
+    if (m.score1 > m.score2) {
+      a.seriesWon++
+      b.seriesLost++
+    } else {
+      b.seriesWon++
+      a.seriesLost++
+    }
+  }
+  return [...tally.values()].sort((x, y) =>
+    y.seriesWon - x.seriesWon || x.seriesLost - y.seriesLost || y.gamesWon - x.gamesWon
+  )
+}
+
+const swissStandings = ref([])
+
+const standingsPanels = computed(() => {
+  const panels = groupedData.value
+    .filter(g => !(g.id === null && g.standings.length === 0 && swissStandings.value.length > 0))
+    .map(g => ({ key: g.id ?? 'all', name: g.name, rows: g.standings }))
+  if (swissStandings.value.length) {
+    panels.push({ key: 'swiss', name: 'Phase suisse', rows: swissStandings.value })
+  }
+  return panels
+})
+
 async function load() {
   const competitionId = Number(props.id)
-  const [competitions, matchList, standingRows, teamList] = await Promise.all([
+  const [competitions, matchList, teamList] = await Promise.all([
     api.getCompetitions(),
     api.getMatchesByCompetition(competitionId),
-    api.getStandings(competitionId),
     api.getTeams()
   ])
   competition.value = competitions.find(c => c.id === competitionId) ?? null
   matches.value = matchList
-  standings.value = standingRows
   teams.value = teamList
+
+  const groups = [...new Map(
+    matchList.filter(m => m.groupId != null).map(m => [m.groupId, m.groupName])
+  ).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.id - b.id)
+
+  const targets = groups.length ? groups : [{ id: null, name: null }]
+  groupedData.value = await Promise.all(targets.map(async g => {
+    const standingRows = await api.getStandings(competitionId, g.id ?? undefined)
+    const groupMatches = matchList.filter(m =>
+      m.phase === 'REGULAR_SEASON' && (g.id == null || m.groupId === g.id)
+    )
+    return { ...g, standings: standingRows, legs: buildLegCells(groupMatches) }
+  }))
+
+  swissStandings.value = computeSwissStandings(
+    matchList.filter(m => m.bracketSide === 'SWISS_STAGE'),
+    teamList
+  )
 
   for (const m of matchList) {
     edits[m.id] = {
@@ -421,6 +559,39 @@ onMounted(load)
 .playoff-options summary {
   cursor: pointer;
   color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.group-panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+}
+.group-panel {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+.group-panel h3 {
+  color: var(--gold);
+  font-size: 0.95em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+.group-block {
+  margin-bottom: 32px;
+}
+.group-block > h3 {
+  color: var(--gold);
+  font-size: 1.05em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+.group-panel h4 {
+  color: var(--text-muted);
+  font-size: 0.82em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   margin-bottom: 8px;
 }
 </style>
