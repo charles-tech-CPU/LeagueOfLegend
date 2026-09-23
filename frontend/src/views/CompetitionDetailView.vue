@@ -448,8 +448,18 @@ async function submitMatch() {
   }
 }
 
-watch(() => props.id, load)
-onMounted(load)
+// Competition sans classement (ex: EMEA Masters LCQ, uniquement des groupes
+// GSL) : on ouvre directement sur le bracket plutot que sur un onglet vide.
+async function initialLoad() {
+  activeTab.value = 'standings'
+  await load()
+  if (standingsPanels.value.every(p => p.rows.length === 0) && playoffMatches.value.length) {
+    activeTab.value = 'bracket'
+  }
+}
+
+watch(() => props.id, initialLoad)
+onMounted(initialLoad)
 </script>
 
 <style scoped>

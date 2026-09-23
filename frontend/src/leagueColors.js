@@ -5,7 +5,10 @@ export const LEAGUE_COLORS = {
   LEC: '#4a9eff',   // Europe — bleu
   LCS: '#e8536a',   // Amérique du Nord — rouge
   LCP: '#f2994a',   // Taiwan (ex-PCL) — orange
-  CBLOL: '#ec4899'  // Brésil — rose
+  CBLOL: '#ec4899', // Brésil — rose
+  WSCI: '#a78bfa',  // World Star Challengers Invitational — violet
+  EM: '#22b8cf',    // EMEA Masters — cyan
+  'EM LCQ': '#22b8cf'
 }
 
 export function leagueColor(code) {

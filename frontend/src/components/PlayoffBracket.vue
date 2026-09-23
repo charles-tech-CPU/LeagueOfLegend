@@ -86,15 +86,39 @@ const SIDE_LABELS = {
   GRAND_FINAL: 'Grande finale',
   REGIONAL_UPPER: 'Bracket vainqueurs',
   REGIONAL_LOWER: 'Bracket perdants',
+  KNOCKOUT: 'Knockout Matches',
   AUTRE: 'Playoffs'
 }
-const SIDE_ORDER = ['GROUP', 'SWISS_STAGE', 'PLACEMENT', 'SEEDING', 'PLAY_IN', 'BRACKET', 'UPPER', 'LOWER', 'GRAND_FINAL', 'REGIONAL_UPPER', 'REGIONAL_LOWER']
+const SIDE_ORDER = ['GROUP', 'SWISS_STAGE', 'KNOCKOUT', 'PLACEMENT', 'SEEDING', 'PLAY_IN', 'BRACKET', 'UPPER', 'LOWER', 'GRAND_FINAL', 'REGIONAL_UPPER', 'REGIONAL_LOWER']
+
+// Groupes GSL (EMEA Masters LCQ) : un mini-bracket par groupe, GSL_1..GSL_n.
+function sideLabel(key) {
+  const gsl = key.match(/^GSL_(\d+)$/)
+  if (gsl) return `Groupe ${gsl[1]}`
+  return SIDE_LABELS[key] ?? key
+}
+
+function sideRank(key) {
+  const i = SIDE_ORDER.indexOf(key.startsWith('GSL_') ? 'GROUP' : key)
+  return i === -1 ? SIDE_ORDER.length : i
+}
+
+// "Quarterfinal 1", "Quarterfinal 2"... sont des matchs du meme round : le
+// numero ne sert qu'a les identifier (liens d'avancement), pas a les separer
+// en colonnes.
+function roundColumn(label) {
+  return label.replace(/\s+\d+$/, '')
+}
+
+function kickoff(m) {
+  return m.date + (m.time ?? '')
+}
 
 // Cotes sans arbre d'avancement (poules, phase suisse, seeding, classement) :
 // l'affichage en colonnes horizontales par round n'a de sens que pour un
 // vrai bracket a elimination (UPPER/LOWER/GRAND_FINAL/PLAY_IN/...). Ailleurs,
 // un simple tableau qui descend se lit bien mieux (moins large, chronologique).
-const TABLE_SIDES = new Set(['GROUP', 'SWISS_STAGE', 'SEEDING', 'PLACEMENT'])
+const TABLE_SIDES = new Set(['GROUP', 'SWISS_STAGE', 'SEEDING', 'PLACEMENT', 'KNOCKOUT'])
 
 function teamHasLogoLookup(teams) {
   const byId = new Map(teams.map(t => [t.id, t.hasLogo]))
@@ -117,38 +141,34 @@ const sides = computed(() => {
     sideGroups.get(sideKey).push(m)
   }
 
-  const sideKeys = [...sideGroups.keys()].sort((a, b) => {
-    const ia = SIDE_ORDER.indexOf(a)
-    const ib = SIDE_ORDER.indexOf(b)
-    if (ia === -1 && ib === -1) return a.localeCompare(b)
-    if (ia === -1) return 1
-    if (ib === -1) return -1
-    return ia - ib
-  })
+  const sideKeys = [...sideGroups.keys()].sort((a, b) =>
+    sideRank(a) - sideRank(b) || a.localeCompare(b, undefined, { numeric: true })
+  )
 
   return sideKeys.map(key => {
     const sideMatches = sideGroups.get(key)
     const isTable = TABLE_SIDES.has(key)
 
     if (isTable) {
-      const flatMatches = [...sideMatches].sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))
-      return { key, label: SIDE_LABELS[key] ?? key, isTable, flatMatches }
+      const flatMatches = [...sideMatches].sort((a, b) => kickoff(a).localeCompare(kickoff(b)))
+      return { key, label: sideLabel(key), isTable, flatMatches }
     }
 
     const roundGroups = new Map()
     for (const m of sideMatches) {
-      if (!roundGroups.has(m.roundLabel)) roundGroups.set(m.roundLabel, [])
-      roundGroups.get(m.roundLabel).push(m)
+      const column = roundColumn(m.roundLabel)
+      if (!roundGroups.has(column)) roundGroups.set(column, [])
+      roundGroups.get(column).push(m)
     }
     const rounds = [...roundGroups.entries()]
       .map(([roundLabel, ms]) => ({
         roundLabel,
-        minDate: ms.reduce((min, m) => (m.date < min ? m.date : min), ms[0].date),
-        matches: ms.sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))
+        start: ms.reduce((min, m) => (kickoff(m) < min ? kickoff(m) : min), kickoff(ms[0])),
+        matches: ms.sort((a, b) => a.roundLabel.localeCompare(b.roundLabel, undefined, { numeric: true }))
       }))
-      .sort((a, b) => a.minDate.localeCompare(b.minDate))
+      .sort((a, b) => a.start.localeCompare(b.start))
 
-    return { key, label: SIDE_LABELS[key] ?? key, isTable, rounds }
+    return { key, label: sideLabel(key), isTable, rounds }
   })
 })
 
