@@ -51,3 +51,29 @@ jobs:
 
       - name: Build de production
         run: npm run build
+
+  sonar:
+    name: Analyse SonarQube Cloud
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Historique complet : Sonar en a besoin pour attribuer les nouveaux problemes
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      # Sonar analyse le bytecode Java : on compile avant le scan
+      - name: Compilation du backend
+        run: mvn -B compile
+        working-directory: backend
+
+      - name: Scan SonarQube Cloud
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
