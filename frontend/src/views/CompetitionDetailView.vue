@@ -52,7 +52,7 @@
     <table v-if="sortedMatches.length">
       <thead>
         <tr>
-          <th class="sortable" @click="toggleDateSort">Date <span class="sort-arrow">{{ dateSortDir === 'asc' ? '▲' : '▼' }}</span></th>
+          <th class="sortable" tabindex="0" @click="toggleDateSort" @keydown.enter="toggleDateSort">Date <span class="sort-arrow">{{ dateSortDir === 'asc' ? '▲' : '▼' }}</span></th>
           <th>Heure</th>
           <th>Phase</th>
           <th>Round</th>
@@ -67,17 +67,17 @@
       </thead>
       <tbody>
         <tr v-for="m in sortedMatches" :key="m.id" :class="{ 'row-scheduled': m.status === 'SCHEDULED' }">
-          <td><input v-model="edits[m.id].date" class="date-input" type="date" /></td>
-          <td><input v-model="edits[m.id].time" class="time-input" type="time" /></td>
+          <td><input v-model="edits[m.id].date" class="date-input" type="date" aria-label="Date" /></td>
+          <td><input v-model="edits[m.id].time" class="time-input" type="time" aria-label="Heure" /></td>
           <td>
-            <select v-model="edits[m.id].phase">
+            <select v-model="edits[m.id].phase" aria-label="Phase">
               <option value="REGULAR_SEASON">Saison rég.</option>
               <option value="PLAYOFFS">Playoffs</option>
             </select>
           </td>
-          <td><input v-model="edits[m.id].roundLabel" class="round-input" /></td>
+          <td><input v-model="edits[m.id].roundLabel" class="round-input" aria-label="Round" /></td>
           <td>
-            <select v-model="edits[m.id].bestOf">
+            <select v-model="edits[m.id].bestOf" aria-label="Format (best of)">
               <option value="BO1">BO1</option>
               <option value="BO3">BO3</option>
               <option value="BO5">BO5</option>
@@ -85,20 +85,20 @@
           </td>
           <td class="team-cell">
             <img v-if="hasLogo(edits[m.id].team1Id)" class="team-logo" :src="teamLogoUrl(edits[m.id].team1Id)" alt="" />
-            <select v-model.number="edits[m.id].team1Id">
+            <select v-model.number="edits[m.id].team1Id" aria-label="Équipe 1">
               <option :value="null">À déterminer</option>
               <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.code }}</option>
             </select>
           </td>
           <td>
-            <input v-model.number="edits[m.id].score1" class="score-input" type="number" min="0" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
+            <input v-model.number="edits[m.id].score1" class="score-input" type="number" min="0" aria-label="Score équipe 1" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
           </td>
           <td>
-            <input v-model.number="edits[m.id].score2" class="score-input" type="number" min="0" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
+            <input v-model.number="edits[m.id].score2" class="score-input" type="number" min="0" aria-label="Score équipe 2" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
           </td>
           <td class="team-cell">
             <img v-if="hasLogo(edits[m.id].team2Id)" class="team-logo" :src="teamLogoUrl(edits[m.id].team2Id)" alt="" />
-            <select v-model.number="edits[m.id].team2Id">
+            <select v-model.number="edits[m.id].team2Id" aria-label="Équipe 2">
               <option :value="null">À déterminer</option>
               <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.code }}</option>
             </select>
@@ -119,59 +119,59 @@
 
     <h2>Ajouter un match</h2>
     <form class="inline" @submit.prevent="submitMatch">
-      <select v-model.number="newMatch.team1Id">
+      <select v-model.number="newMatch.team1Id" aria-label="Équipe 1">
         <option :value="null">Équipe 1 (à déterminer)</option>
         <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.code }}</option>
       </select>
-      <select v-model.number="newMatch.team2Id">
+      <select v-model.number="newMatch.team2Id" aria-label="Équipe 2">
         <option :value="null">Équipe 2 (à déterminer)</option>
         <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.code }}</option>
       </select>
-      <input v-model="newMatch.roundLabel" placeholder="Round (ex: W1, QF, F)" required />
-      <input v-model="newMatch.date" type="date" required />
-      <input v-model="newMatch.time" type="time" />
-      <select v-model="newMatch.bestOf">
+      <input v-model="newMatch.roundLabel" placeholder="Round (ex: W1, QF, F)" aria-label="Round" required />
+      <input v-model="newMatch.date" type="date" aria-label="Date" required />
+      <input v-model="newMatch.time" type="time" aria-label="Heure" />
+      <select v-model="newMatch.bestOf" aria-label="Format (best of)">
         <option value="BO1">BO1</option>
         <option value="BO3">BO3</option>
         <option value="BO5">BO5</option>
       </select>
-      <input v-model.number="newMatch.score1" class="score-input" type="number" min="0" placeholder="S1" />
-      <input v-model.number="newMatch.score2" class="score-input" type="number" min="0" placeholder="S2" />
+      <input v-model.number="newMatch.score1" class="score-input" type="number" min="0" placeholder="S1" aria-label="Score équipe 1" />
+      <input v-model.number="newMatch.score2" class="score-input" type="number" min="0" placeholder="S2" aria-label="Score équipe 2" />
       <button type="submit">Ajouter</button>
     </form>
 
     <details class="playoff-options">
       <summary>Options playoffs / bracket (facultatif)</summary>
       <div class="inline">
-        <select v-model="newMatch.phase">
+        <select v-model="newMatch.phase" aria-label="Phase">
           <option value="REGULAR_SEASON">Saison régulière</option>
           <option value="PLAYOFFS">Playoffs</option>
         </select>
-        <select v-model="newMatch.bracketSide">
+        <select v-model="newMatch.bracketSide" aria-label="Côté du bracket">
           <option :value="null">Côté bracket (aucun)</option>
           <option value="GROUP">Poules</option>
           <option value="PLAY_IN">Play-in</option>
           <option value="UPPER">Bracket vainqueurs</option>
           <option value="LOWER">Bracket perdants</option>
         </select>
-        <select v-model.number="newMatch.nextMatchId">
+        <select v-model.number="newMatch.nextMatchId" aria-label="Match suivant du vainqueur">
           <option :value="null">Match suivant (vainqueur) : aucun</option>
           <option v-for="m in playoffMatches" :key="m.id" :value="m.id">
             #{{ m.id }} — {{ m.roundLabel }} ({{ m.team1Code ?? '?' }} vs {{ m.team2Code ?? '?' }})
           </option>
         </select>
-        <select v-model.number="newMatch.nextMatchSlot">
+        <select v-model.number="newMatch.nextMatchSlot" aria-label="Slot du vainqueur">
           <option :value="null">Slot</option>
           <option :value="1">Équipe 1</option>
           <option :value="2">Équipe 2</option>
         </select>
-        <select v-model.number="newMatch.loserNextMatchId">
+        <select v-model.number="newMatch.loserNextMatchId" aria-label="Match suivant du perdant">
           <option :value="null">Match suivant (perdant) : aucun</option>
           <option v-for="m in playoffMatches" :key="m.id" :value="m.id">
             #{{ m.id }} — {{ m.roundLabel }} ({{ m.team1Code ?? '?' }} vs {{ m.team2Code ?? '?' }})
           </option>
         </select>
-        <select v-model.number="newMatch.loserNextMatchSlot">
+        <select v-model.number="newMatch.loserNextMatchSlot" aria-label="Slot du perdant">
           <option :value="null">Slot</option>
           <option :value="1">Équipe 1</option>
           <option :value="2">Équipe 2</option>
@@ -277,8 +277,10 @@ function buildLegCells(groupMatches) {
     for (const arr of pairs.values()) {
       const m = arr[i]
       if (!m) continue
-      cells.push({ teamAId: m.team1Id, teamBId: m.team2Id, score: `${m.score1}-${m.score2}` })
-      cells.push({ teamAId: m.team2Id, teamBId: m.team1Id, score: `${m.score2}-${m.score1}` })
+      cells.push(
+        { teamAId: m.team1Id, teamBId: m.team2Id, score: `${m.score1}-${m.score2}` },
+        { teamAId: m.team2Id, teamBId: m.team1Id, score: `${m.score2}-${m.score1}` },
+      )
     }
     legs.push(cells)
   }
@@ -286,7 +288,9 @@ function buildLegCells(groupMatches) {
 }
 
 function legLabel(index) {
-  return index === 0 ? 'Match aller' : index === 1 ? 'Match retour' : `Manche ${index + 1}`
+  if (index === 0) return 'Match aller'
+  if (index === 1) return 'Match retour'
+  return `Manche ${index + 1}`
 }
 
 /**

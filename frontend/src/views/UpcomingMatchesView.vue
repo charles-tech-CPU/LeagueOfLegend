@@ -6,10 +6,10 @@
     <table v-if="sortedMatches.length">
       <thead>
         <tr>
-          <th class="sortable" @click="toggleSort('competition')">
+          <th class="sortable" tabindex="0" @click="toggleSort('competition')" @keydown.enter="toggleSort('competition')">
             Compétition <span class="sort-arrow">{{ sortArrow('competition') }}</span>
           </th>
-          <th class="sortable" @click="toggleSort('date')">
+          <th class="sortable" tabindex="0" @click="toggleSort('date')" @keydown.enter="toggleSort('date')">
             Date <span class="sort-arrow">{{ sortArrow('date') }}</span>
           </th>
           <th>Heure</th>
@@ -28,17 +28,17 @@
           <td>
             <router-link :to="`/competitions/${m.competitionId}`" class="competition-link league-badge">{{ m.competitionCode }}</router-link>
           </td>
-          <td><input v-model="edits[m.id].date" class="date-input" type="date" /></td>
-          <td><input v-model="edits[m.id].time" class="time-input" type="time" /></td>
+          <td><input v-model="edits[m.id].date" class="date-input" type="date" aria-label="Date" /></td>
+          <td><input v-model="edits[m.id].time" class="time-input" type="time" aria-label="Heure" /></td>
           <td>
-            <select v-model="edits[m.id].phase">
+            <select v-model="edits[m.id].phase" aria-label="Phase">
               <option value="REGULAR_SEASON">Saison rég.</option>
               <option value="PLAYOFFS">Playoffs</option>
             </select>
           </td>
-          <td><input v-model="edits[m.id].roundLabel" class="round-input" /></td>
+          <td><input v-model="edits[m.id].roundLabel" class="round-input" aria-label="Round" /></td>
           <td>
-            <select v-model="edits[m.id].bestOf">
+            <select v-model="edits[m.id].bestOf" aria-label="Format (best of)">
               <option value="BO1">BO1</option>
               <option value="BO3">BO3</option>
               <option value="BO5">BO5</option>
@@ -46,20 +46,20 @@
           </td>
           <td class="team-cell">
             <img v-if="hasLogo(edits[m.id].team1Id)" class="team-logo" :src="teamLogoUrl(edits[m.id].team1Id)" alt="" />
-            <select v-model.number="edits[m.id].team1Id">
+            <select v-model.number="edits[m.id].team1Id" aria-label="Équipe 1">
               <option :value="null">À déterminer</option>
               <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.code }}</option>
             </select>
           </td>
           <td>
-            <input v-model.number="edits[m.id].score1" class="score-input" type="number" min="0" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
+            <input v-model.number="edits[m.id].score1" class="score-input" type="number" min="0" aria-label="Score équipe 1" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
           </td>
           <td>
-            <input v-model.number="edits[m.id].score2" class="score-input" type="number" min="0" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
+            <input v-model.number="edits[m.id].score2" class="score-input" type="number" min="0" aria-label="Score équipe 2" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
           </td>
           <td class="team-cell">
             <img v-if="hasLogo(edits[m.id].team2Id)" class="team-logo" :src="teamLogoUrl(edits[m.id].team2Id)" alt="" />
-            <select v-model.number="edits[m.id].team2Id">
+            <select v-model.number="edits[m.id].team2Id" aria-label="Équipe 2">
               <option :value="null">À déterminer</option>
               <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.code }}</option>
             </select>

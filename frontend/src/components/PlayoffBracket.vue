@@ -107,7 +107,9 @@ function sideRank(key) {
 // numero ne sert qu'a les identifier (liens d'avancement), pas a les separer
 // en colonnes.
 function roundColumn(label) {
-  return label.replace(/\s+\d+$/, '')
+  const lastSpace = label.lastIndexOf(' ')
+  const lastWord = label.slice(lastSpace + 1)
+  return lastSpace > 0 && /^\d+$/.test(lastWord) ? label.slice(0, lastSpace).trimEnd() : label
 }
 
 function kickoff(m) {

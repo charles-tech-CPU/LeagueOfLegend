@@ -1,5 +1,7 @@
 # LoL Results
 
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=charles-tech-CPU_LeagueOfLegend&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=charles-tech-CPU_LeagueOfLegend) [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=charles-tech-CPU_LeagueOfLegend&metric=bugs)](https://sonarcloud.io/summary/new_code?id=charles-tech-CPU_LeagueOfLegend) [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=charles-tech-CPU_LeagueOfLegend&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=charles-tech-CPU_LeagueOfLegend) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=charles-tech-CPU_LeagueOfLegend&metric=coverage)](https://sonarcloud.io/summary/new_code?id=charles-tech-CPU_LeagueOfLegend) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=charles-tech-CPU_LeagueOfLegend&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=charles-tech-CPU_LeagueOfLegend)
+
 Application de saisie et consultation de résultats League of Legends esport (LEC, LCS, LCK, LPL, LCP, CBLOL). Backend Java / Spring Boot, frontend Vue 3, base PostgreSQL.
 
 Ce README couvre tout ce qu'il faut lancer **sur ta machine** : je n'ai pas d'accès terminal chez toi, donc les commandes ci-dessous sont à copier-coller toi-même (dans le terminal intégré d'IntelliJ, par exemple).

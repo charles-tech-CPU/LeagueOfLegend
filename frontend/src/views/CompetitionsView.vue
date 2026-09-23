@@ -25,14 +25,14 @@
 
   <h2>Ajouter une compétition</h2>
   <form class="inline" @submit.prevent="submit">
-    <input v-model="form.code" placeholder="Code (ex: LEC)" required />
-    <input v-model="form.name" placeholder="Nom (ex: LEC 2026)" required />
-    <select v-model="form.type">
+    <input v-model="form.code" placeholder="Code (ex: LEC)" aria-label="Code" required />
+    <input v-model="form.name" placeholder="Nom (ex: LEC 2026)" aria-label="Nom" required />
+    <select v-model="form.type" aria-label="Type de compétition">
       <option value="REGIONAL_LEAGUE">Ligue régionale</option>
       <option value="INTERNATIONAL_EVENT">Événement international</option>
     </select>
-    <input v-model="form.region" placeholder="Région (ex: EMEA)" />
-    <input v-model.number="form.season" type="number" placeholder="Saison" required />
+    <input v-model="form.region" placeholder="Région (ex: EMEA)" aria-label="Région" />
+    <input v-model.number="form.season" type="number" placeholder="Saison" aria-label="Saison" required />
     <button type="submit">Ajouter</button>
   </form>
   <p v-if="error" style="color:#ff6b6b">{{ error }}</p>

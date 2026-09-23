@@ -68,12 +68,20 @@ jobs:
           cache: maven
           cache-dependency-path: backend/pom.xml
 
-      # Sonar analyse le bytecode Java : on compile avant le scan
-      - name: Compilation du backend
-        run: mvn -B compile
+      # Sonar analyse le bytecode Java et lit le rapport de couverture JaCoCo :
+      # on compile et on lance les tests avant le scan
+      - name: Compilation, tests et couverture du backend
+        run: mvn -B verify
         working-directory: backend
 
       - name: Scan SonarQube Cloud
         uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # Fait echouer la CI si le code ne respecte pas le Quality Gate SonarQube Cloud
+      - name: Verification du Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

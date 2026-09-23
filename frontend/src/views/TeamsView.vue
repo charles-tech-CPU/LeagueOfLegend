@@ -5,13 +5,13 @@
     <thead>
       <tr>
         <th></th>
-        <th class="sortable" @click="toggleSort('code')">
+        <th class="sortable" tabindex="0" @click="toggleSort('code')" @keydown.enter="toggleSort('code')">
           Code <span class="sort-arrow">{{ sortArrow('code') }}</span>
         </th>
-        <th class="sortable" @click="toggleSort('name')">
+        <th class="sortable" tabindex="0" @click="toggleSort('name')" @keydown.enter="toggleSort('name')">
           Nom <span class="sort-arrow">{{ sortArrow('name') }}</span>
         </th>
-        <th class="sortable" @click="toggleSort('region')">
+        <th class="sortable" tabindex="0" @click="toggleSort('region')" @keydown.enter="toggleSort('region')">
           Région <span class="sort-arrow">{{ sortArrow('region') }}</span>
         </th>
         <th></th>
@@ -23,9 +23,9 @@
           <img v-if="t.hasLogo" class="team-logo" :src="teamLogoUrl(t.id)" :alt="t.code" />
         </td>
         <template v-if="editingId === t.id">
-          <td><input v-model="editForm.code" /></td>
-          <td><input v-model="editForm.name" /></td>
-          <td><input v-model="editForm.region" /></td>
+          <td><input v-model="editForm.code" aria-label="Code" /></td>
+          <td><input v-model="editForm.name" aria-label="Nom" /></td>
+          <td><input v-model="editForm.region" aria-label="Région" /></td>
           <td class="actions">
             <button @click="saveEdit(t)">Enregistrer</button>
             <button type="button" class="btn-secondary" @click="cancelEdit">Annuler</button>
@@ -46,9 +46,9 @@
 
   <h2>Ajouter une équipe</h2>
   <form class="inline" @submit.prevent="submit">
-    <input v-model="form.code" placeholder="Code (ex: G2)" required />
-    <input v-model="form.name" placeholder="Nom complet (ex: G2 Esports)" required />
-    <input v-model="form.region" placeholder="Région (ex: EMEA)" />
+    <input v-model="form.code" placeholder="Code (ex: G2)" aria-label="Code" required />
+    <input v-model="form.name" placeholder="Nom complet (ex: G2 Esports)" aria-label="Nom complet" required />
+    <input v-model="form.region" placeholder="Région (ex: EMEA)" aria-label="Région" />
     <button type="submit">Ajouter</button>
   </form>
   <p v-if="error" style="color:#ff6b6b">{{ error }}</p>

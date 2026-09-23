@@ -19,6 +19,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/teams")
 public class TeamController {
 
+    private static final String TEAM_NOT_FOUND = "Equipe introuvable : ";
+
     private final TeamRepository teamRepository;
 
     public TeamController(TeamRepository teamRepository) {
@@ -38,7 +40,7 @@ public class TeamController {
         return teamRepository
                 .findById(id)
                 .map(TeamDto::from)
-                .orElseThrow(() -> new EntityNotFoundException("Equipe introuvable : " + id));
+                .orElseThrow(() -> new EntityNotFoundException(TEAM_NOT_FOUND + id));
     }
 
     @PostMapping
@@ -50,9 +52,7 @@ public class TeamController {
 
     @PutMapping("/{id}")
     public TeamDto update(@PathVariable Long id, @Valid @RequestBody TeamCreateDto dto) {
-        Team team = teamRepository
-                .findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Equipe introuvable : " + id));
+        Team team = teamRepository.findById(id).orElseThrow(() -> new EntityNotFoundException(TEAM_NOT_FOUND + id));
         team.setCode(dto.code());
         team.setName(dto.name());
         team.setRegion(dto.region());
@@ -67,9 +67,7 @@ public class TeamController {
 
     @GetMapping("/{id}/logo")
     public ResponseEntity<byte[]> logo(@PathVariable Long id) {
-        Team team = teamRepository
-                .findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Equipe introuvable : " + id));
+        Team team = teamRepository.findById(id).orElseThrow(() -> new EntityNotFoundException(TEAM_NOT_FOUND + id));
         if (team.getLogo() == null) {
             return ResponseEntity.notFound().build();
         }
@@ -82,9 +80,7 @@ public class TeamController {
     @PostMapping("/{id}/logo")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void uploadLogo(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
-        Team team = teamRepository
-                .findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Equipe introuvable : " + id));
+        Team team = teamRepository.findById(id).orElseThrow(() -> new EntityNotFoundException(TEAM_NOT_FOUND + id));
         team.setLogo(file.getBytes());
         team.setLogoContentType(file.getContentType());
         teamRepository.save(team);
