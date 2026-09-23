@@ -2,6 +2,11 @@
   <h1>À venir</h1>
   <p class="subtitle">Tous les matchs pas encore joués, toutes compétitions confondues. Enregistre un score dès qu'un match est terminé, il quittera automatiquement cette liste.</p>
 
+  <p v-if="todayCount" class="today-summary">
+    <span class="today-badge">Aujourd'hui</span>
+    {{ todayCount }} match{{ todayCount > 1 ? 's' : '' }} au programme
+  </p>
+
   <div class="table-scroll">
     <table v-if="sortedMatches.length">
       <thead>
@@ -24,9 +29,15 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="m in sortedMatches" :key="m.id" :style="{ '--league-color': leagueColor(m.competitionCode) }">
+        <tr
+          v-for="m in sortedMatches"
+          :key="m.id"
+          :class="{ 'row-today': isToday(m) }"
+          :style="{ '--league-color': leagueColor(m.competitionCode) }"
+        >
           <td>
             <router-link :to="`/competitions/${m.competitionId}`" class="competition-link league-badge">{{ m.competitionCode }}</router-link>
+            <span v-if="isToday(m)" class="today-badge">Aujourd'hui</span>
           </td>
           <td><input v-model="edits[m.id].date" class="date-input" type="date" aria-label="Date" /></td>
           <td><input v-model="edits[m.id].time" class="time-input" type="time" aria-label="Heure" /></td>
@@ -121,6 +132,21 @@ function sortArrow(field) {
   return sortDir.value === 'asc' ? '▲' : '▼'
 }
 
+// Date locale (et non UTC) au format ISO "AAAA-MM-JJ", comme m.date renvoye par l'API
+function localIsoDate(d) {
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${month}-${day}`
+}
+
+const today = ref(localIsoDate(new Date()))
+
+function isToday(match) {
+  return match.date === today.value
+}
+
+const todayCount = computed(() => matches.value.filter(isToday).length)
+
 function hasLogo(teamId) {
   return teams.value.find(t => t.id === teamId)?.hasLogo ?? false
 }
@@ -150,6 +176,7 @@ async function load() {
       score2: m.score2
     }
   }
+  today.value = localIsoDate(new Date())
   loaded.value = true
 }
 
@@ -268,6 +295,33 @@ onMounted(load)
 .table-scroll .score-input {
   width: 56px;
   padding: 9px 6px;
+}
+.table-scroll tbody tr.row-today {
+  background: rgba(10, 200, 185, 0.1);
+  box-shadow: inset 0 1px 0 rgba(10, 200, 185, 0.45), inset 0 -1px 0 rgba(10, 200, 185, 0.45);
+}
+.table-scroll tbody tr.row-today:hover {
+  background: rgba(10, 200, 185, 0.16);
+}
+.today-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75em;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--bg);
+  background: var(--cyan);
+  white-space: nowrap;
+}
+.today-summary {
+  color: var(--text);
+  margin-bottom: 16px;
+}
+.today-summary .today-badge {
+  margin-left: 0;
+  margin-right: 6px;
 }
 .empty {
   padding: 24px 0;
