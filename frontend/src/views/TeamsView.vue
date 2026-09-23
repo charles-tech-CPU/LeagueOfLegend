@@ -1,5 +1,5 @@
 <template>
-  <h1>Équipes</h1>
+  <h1>Équipes <span class="count">{{ teams.length }}</span></h1>
 
   <table v-if="sortedTeams.length">
     <thead>
@@ -32,8 +32,8 @@
           </td>
         </template>
         <template v-else>
-          <td>{{ t.code }}</td>
-          <td>{{ t.name }}</td>
+          <td class="code">{{ t.code }}</td>
+          <td class="name">{{ t.name }}</td>
           <td>{{ t.region }}</td>
           <td class="actions">
             <button type="button" class="btn-secondary" @click="startEdit(t)">Modifier</button>
@@ -51,7 +51,7 @@
     <input v-model="form.region" placeholder="Région (ex: EMEA)" aria-label="Région" />
     <button type="submit">Ajouter</button>
   </form>
-  <p v-if="error" style="color:#ff6b6b">{{ error }}</p>
+  <p v-if="error" class="error">{{ error }}</p>
 </template>
 
 <script setup>
@@ -115,20 +115,22 @@ onMounted(load)
 </script>
 
 <style scoped>
-.sort-arrow {
-  font-size: 0.8em;
-  color: var(--gold);
+.code {
+  font-weight: 800;
+}
+.name {
+  color: var(--text-muted);
 }
 .actions {
   display: flex;
   gap: 6px;
 }
-.btn-secondary {
-  background: var(--panel-alt);
-  color: var(--text);
-  border-color: var(--border);
-}
-.btn-secondary:hover {
-  background: var(--border);
+.count {
+  font-size: 0.45em;
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
 }
 </style>

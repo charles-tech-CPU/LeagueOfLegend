@@ -83,8 +83,11 @@ function cellClass(row, col) {
 .h2h-table td {
   border: 1px solid var(--border);
   text-align: center;
-  padding: 6px 8px;
-  font-size: 0.82em;
+  padding: 7px 9px;
+  font-size: 0.84em;
+}
+.h2h-table {
+  border-radius: var(--radius);
 }
 .corner {
   background: transparent;
@@ -113,9 +116,11 @@ function cellClass(row, col) {
   color: var(--text);
 }
 .team-logo-sm {
-  height: 18px;
-  width: auto;
-  max-width: 24px;
+  height: 22px;
+  width: 22px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--logo-bg);
   object-fit: contain;
 }
 .rank {
@@ -128,7 +133,7 @@ function cellClass(row, col) {
   font-weight: 700;
   font-size: 0.75em;
   color: var(--text-muted);
-  background: rgba(200, 170, 110, 0.12);
+  background: rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
 }
 .cell {
@@ -138,15 +143,15 @@ function cellClass(row, col) {
   color: var(--text-muted);
 }
 .cell-win {
-  background: rgba(63, 185, 110, 0.18);
-  color: #7fe0a0;
+  background: rgba(52, 211, 153, 0.16);
+  color: var(--win);
 }
 .cell-loss {
-  background: rgba(232, 83, 106, 0.16);
-  color: #f28b9a;
+  background: rgba(251, 113, 133, 0.14);
+  color: var(--loss);
 }
 .cell-draw {
-  background: rgba(200, 170, 110, 0.12);
+  background: rgba(255, 255, 255, 0.05);
 }
 .empty {
   color: var(--text-dim);

@@ -2,10 +2,20 @@
   <h1>À venir</h1>
   <p class="subtitle">Tous les matchs pas encore joués, toutes compétitions confondues. Enregistre un score dès qu'un match est terminé, il quittera automatiquement cette liste.</p>
 
-  <p v-if="todayCount" class="today-summary">
-    <span class="today-badge">Aujourd'hui</span>
-    {{ todayCount }} match{{ todayCount > 1 ? 's' : '' }} au programme
-  </p>
+  <div v-if="loaded && matches.length" class="summary">
+    <div class="summary-card" :class="{ highlight: todayCount }">
+      <span class="summary-value">{{ todayCount }}</span>
+      <span class="summary-label">aujourd'hui</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-value">{{ weekCount }}</span>
+      <span class="summary-label">dans les 7 jours</span>
+    </div>
+    <div class="summary-card">
+      <span class="summary-value">{{ matches.length }}</span>
+      <span class="summary-label">au total</span>
+    </div>
+  </div>
 
   <div class="table-scroll">
     <table v-if="sortedMatches.length">
@@ -29,33 +39,36 @@
         </tr>
       </thead>
       <tbody>
-        <tr
-          v-for="m in sortedMatches"
-          :key="m.id"
-          :class="{ 'row-today': isToday(m) }"
-          :style="{ '--league-color': leagueColor(m.competitionCode) }"
-        >
-          <td>
-            <router-link :to="`/competitions/${m.competitionId}`" class="competition-link league-badge">{{ m.competitionCode }}</router-link>
-            <span v-if="isToday(m)" class="today-badge">Aujourd'hui</span>
-          </td>
-          <MatchEditCells v-model="edits[m.id]" :teams="teams" />
-          <td>
-            <button :disabled="!canSave(edits[m.id])" @click="saveMatch(m)">Enregistrer</button>
-          </td>
-        </tr>
+        <template v-for="m in sortedMatches" :key="m.id">
+          <tr v-if="dayHeaders.has(m.id)" class="day-row" :class="{ today: isToday(m) }">
+            <td colspan="11">{{ dayHeaders.get(m.id) }}</td>
+          </tr>
+          <tr
+            :class="{ 'row-today': isToday(m) }"
+            :style="{ '--league-color': leagueColor(m.competitionCode) }"
+          >
+            <td>
+              <router-link :to="`/competitions/${m.competitionId}`" class="competition-link league-badge">{{ m.competitionCode }}</router-link>
+            </td>
+            <MatchEditCells v-model="edits[m.id]" :teams="teams" />
+            <td>
+              <button :disabled="!canSave(edits[m.id])" @click="saveMatch(m)">Enregistrer</button>
+            </td>
+          </tr>
+        </template>
       </tbody>
     </table>
     <p v-else-if="loaded" class="empty">Aucun match à venir : tout est joué 🎉</p>
   </div>
 
-  <p v-if="error" style="color:#ff6b6b">{{ error }}</p>
+  <p v-if="error" class="error">{{ error }}</p>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import api from '../services/api'
 import { leagueColor } from '../leagueColors'
+import { localIsoDate, longDay } from '../format'
 import { canSave, kickoff, toEditForm, toMatchPayload } from '../matchEdit'
 import { useSort } from '../composables/useSort'
 import MatchEditCells from '../components/MatchEditCells.vue'
@@ -66,18 +79,11 @@ const loaded = ref(false)
 const error = ref('')
 const edits = reactive({})
 
-const { toggleSort, sortArrow, sortList } = useSort('date', (m, field) =>
+const { sortBy, toggleSort, sortArrow, sortList } = useSort('date', (m, field) =>
   field === 'competition' ? m.competitionCode : kickoff(m)
 )
 
 const sortedMatches = computed(() => sortList(matches.value))
-
-// Date locale (et non UTC) au format ISO "AAAA-MM-JJ", comme m.date renvoye par l'API
-function localIsoDate(d) {
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${month}-${day}`
-}
 
 const today = ref(localIsoDate(new Date()))
 
@@ -86,6 +92,28 @@ function isToday(match) {
 }
 
 const todayCount = computed(() => matches.value.filter(isToday).length)
+
+const weekCount = computed(() => {
+  const limit = new Date()
+  limit.setDate(limit.getDate() + 7)
+  const limitIso = localIsoDate(limit)
+  return matches.value.filter(m => m.date >= today.value && m.date < limitIso).length
+})
+
+// Intercalaire "Aujourd'hui", "Demain", "samedi 26 septembre"... devant le
+// premier match de chaque jour, seulement quand la liste est triee par date.
+const dayHeaders = computed(() => {
+  const headers = new Map()
+  if (sortBy.value !== 'date') return headers
+  let previous = null
+  for (const m of sortedMatches.value) {
+    if (m.date !== previous) {
+      headers.set(m.id, longDay(m.date, today.value))
+      previous = m.date
+    }
+  }
+  return headers
+})
 
 async function load() {
   const [matchList, teamList] = await Promise.all([
@@ -120,51 +148,66 @@ onMounted(load)
   color: var(--text-muted);
   margin-top: -8px;
   margin-bottom: 20px;
+  max-width: 720px;
 }
-.table-scroll tbody tr {
-  border-left: 3px solid var(--league-color);
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 22px;
 }
-.competition-link.league-badge {
-  display: inline-block;
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.summary-card.highlight {
+  border-color: rgba(34, 211, 238, 0.5);
+  box-shadow: var(--glow);
+}
+.summary-value {
+  font-family: "Outfit", sans-serif;
+  font-size: 1.6em;
+  font-weight: 800;
+}
+.highlight .summary-value {
+  color: var(--accent);
+}
+.summary-label {
+  font-size: 0.78em;
+  color: var(--text-muted);
+}
+.table-scroll tbody tr td:first-child {
+  box-shadow: inset 3px 0 0 var(--league-color);
+}
+.table-scroll tbody tr.day-row td {
+  box-shadow: none;
+  padding: 16px 14px 8px;
+  font-family: "Outfit", sans-serif;
   font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 0.85em;
-  letter-spacing: 0.03em;
-  color: var(--league-color);
-  background: color-mix(in srgb, var(--league-color) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--league-color) 45%, transparent);
+  font-size: 0.95em;
+  color: var(--text);
+  background: var(--panel-alt);
+}
+.table-scroll tbody tr.day-row.today td {
+  color: var(--accent);
+}
+.table-scroll tbody tr.day-row:hover {
+  background: none;
 }
 .competition-link.league-badge:hover {
   color: var(--league-color);
   filter: brightness(1.2);
 }
 .table-scroll tbody tr.row-today {
-  background: rgba(10, 200, 185, 0.1);
-  box-shadow: inset 0 1px 0 rgba(10, 200, 185, 0.45), inset 0 -1px 0 rgba(10, 200, 185, 0.45);
+  background: rgba(34, 211, 238, 0.06);
 }
 .table-scroll tbody tr.row-today:hover {
-  background: rgba(10, 200, 185, 0.16);
-}
-.today-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.75em;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: var(--bg);
-  background: var(--cyan);
-  white-space: nowrap;
-}
-.today-summary {
-  color: var(--text);
-  margin-bottom: 16px;
-}
-.today-summary .today-badge {
-  margin-left: 0;
-  margin-right: 6px;
+  background: rgba(34, 211, 238, 0.12);
 }
 .empty {
   padding: 24px 0;

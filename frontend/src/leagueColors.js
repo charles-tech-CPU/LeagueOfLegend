@@ -7,6 +7,8 @@ export const LEAGUE_COLORS = {
   LCP: '#f2994a',   // Taiwan (ex-PCL) — orange
   CBLOL: '#ec4899', // Brésil — rose
   WSCI: '#a78bfa',  // World Star Challengers Invitational — violet
+  WORLDS: '#f5c451', // Worlds — or
+  DEMACIA: '#94a3b8', // Demacia Cup — argent
   EM: '#22b8cf',    // EMEA Masters — cyan
   'EM LCQ': '#22b8cf'
 }

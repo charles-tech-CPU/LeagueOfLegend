@@ -29,5 +29,5 @@ export function useSort(initialField, sortKey) {
     })
   }
 
-  return { toggleSort, sortArrow, sortList }
+  return { sortBy, toggleSort, sortArrow, sortList }
 }

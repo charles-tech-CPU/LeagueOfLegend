@@ -18,7 +18,7 @@ Ce README couvre tout ce qu'il faut lancer **sur ta machine** : je n'ai pas d'ac
 
 - Les **matchs** (`match`) sont la seule source de vérité : un match peut exister avant d'être joué (`SCHEDULED`, scores vides) puis être complété (`COMPLETED`).
 - Le **classement** et le **tête-à-tête** ne sont **pas stockés** : ils sont recalculés à chaque requête à partir des matchs joués (`StandingsService` côté backend). Comme ça, pas de risque d'incohérence entre les résultats et le classement, contrairement au fichier Excel maintenu à la main.
-- Les **playoffs** sont pour l'instant de simples matchs avec un `roundLabel` libre ("QF", "SF", "F", "Losers Bracket R1"...), pas un arbre de bracket graphique. C'est un choix volontaire pour la v1, évoqué comme piste d'évolution plus bas.
+- Les **playoffs** sont des matchs avec un `roundLabel` libre ("QF", "SF", "F"...) et un côté de bracket (`bracketSide`). Le frontend les dessine en arbre (`frontend/src/bracketLayout.js`) : traits vers le match suivant (liens `nextMatchId`, ou déduits des équipes quand ils manquent), bracket haut/bas, grande finale, phase suisse regroupée par bilan.
 
 ## 3. Base de données
 

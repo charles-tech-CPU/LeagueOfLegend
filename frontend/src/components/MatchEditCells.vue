@@ -57,11 +57,11 @@ function hasLogo(teamId) {
 
 <style scoped>
 .date-input {
-  width: 130px;
+  width: 140px;
   padding: 9px 6px;
 }
 .time-input {
-  width: 84px;
+  width: 100px;
   padding: 9px 6px;
 }
 .round-input {
@@ -81,8 +81,8 @@ select {
   width: 88px;
 }
 .team-logo {
-  height: 24px;
-  max-width: 34px;
+  height: 26px;
+  width: 26px;
   padding: 2px;
 }
 .score-input {

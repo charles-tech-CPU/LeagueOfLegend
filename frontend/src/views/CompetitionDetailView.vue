@@ -1,30 +1,62 @@
 <template>
-  <p><router-link to="/">← Toutes les compétitions</router-link></p>
-  <h1>
-    <span v-if="competition" class="league-badge" :style="{ '--league-color': leagueColor(competition.code) }">{{ competition.code }}</span>
-    {{ competition?.name ?? '...' }}
-  </h1>
+  <router-link to="/" class="back">← Toutes les compétitions</router-link>
 
-  <div class="tabs">
-    <button type="button" :class="{ active: activeTab === 'standings' }" @click="activeTab = 'standings'">Classement</button>
-    <button type="button" :class="{ active: activeTab === 'bracket' }" @click="activeTab = 'bracket'">Bracket</button>
-    <button v-if="regionalFinalsMatches.length" type="button" :class="{ active: activeTab === 'regionalFinals' }" @click="activeTab = 'regionalFinals'">Regional Finals</button>
-    <button type="button" :class="{ active: activeTab === 'h2h' }" @click="activeTab = 'h2h'">Confrontations</button>
-    <button type="button" :class="{ active: activeTab === 'calendar' }" @click="activeTab = 'calendar'">Calendrier</button>
+  <header class="hero" :style="{ '--league-color': leagueColor(competition?.code) }">
+    <div class="hero-main">
+      <span v-if="competition" class="league-badge">{{ competition.code }}</span>
+      <h1>{{ competition?.name ?? '...' }}</h1>
+      <p v-if="competition" class="hero-sub">
+        {{ competition.type === 'REGIONAL_LEAGUE' ? 'Ligue régionale' : 'Événement international' }}
+        <template v-if="competition.region"> · {{ competition.region }}</template>
+        · Saison {{ competition.season }}
+      </p>
+    </div>
+    <div v-if="loaded" class="hero-stats">
+      <div class="stat">
+        <span class="stat-value">{{ playedCount }}<span class="stat-total">/{{ matches.length }}</span></span>
+        <span class="stat-label">matchs joués</span>
+        <span class="progress"><span :style="{ width: `${progress}%` }"></span></span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">{{ teamCount }}</span>
+        <span class="stat-label">équipes</span>
+      </div>
+      <div v-if="nextMatch" class="stat">
+        <span class="stat-value small">{{ longDay(nextMatch.date) }}</span>
+        <span class="stat-label">prochain : {{ nextMatch.team1Code ?? '?' }} vs {{ nextMatch.team2Code ?? '?' }}</span>
+      </div>
+      <div v-else-if="champion" class="stat champion-stat">
+        <span class="stat-value small">🏆 {{ champion }}</span>
+        <span class="stat-label">champion</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button
+      v-for="t in tabs"
+      :key="t.key"
+      type="button"
+      role="tab"
+      :aria-selected="activeTab === t.key"
+      :class="{ active: activeTab === t.key }"
+      @click="activeTab = t.key"
+    >
+      <span class="tab-icon">{{ t.icon }}</span>{{ t.label }}
+    </button>
   </div>
 
-  <section v-if="activeTab === 'standings'">
-    <h2>Classement</h2>
+  <section v-if="activeTab === 'standings'" class="tab-panel">
     <div class="group-panels">
       <div v-for="p in standingsPanels" :key="p.key" class="group-panel">
         <h3 v-if="p.name">{{ p.name }}</h3>
-        <StandingsTable :rows="p.rows" />
+        <StandingsTable :rows="p.rows" :matches="p.matches" />
       </div>
     </div>
   </section>
 
-  <section v-if="activeTab === 'h2h'">
-    <h2>Confrontations directes</h2>
+  <section v-if="activeTab === 'h2h'" class="tab-panel">
+    <p class="hint">Chaque case donne le score de la série <strong>du point de vue de l'équipe en ligne</strong> : vert = victoire, rouge = défaite.</p>
     <div v-for="g in groupedData" :key="g.id ?? 'all'" class="group-block">
       <h3 v-if="g.name">{{ g.name }}</h3>
       <div class="group-panels">
@@ -36,18 +68,15 @@
     </div>
   </section>
 
-  <section v-if="activeTab === 'bracket'">
-    <h2>Playoffs</h2>
+  <section v-if="activeTab === 'bracket'" class="tab-panel">
     <PlayoffBracket :matches="playoffMatches" :teams="teams" />
   </section>
 
-  <section v-if="activeTab === 'regionalFinals'">
-    <h2>Regional Finals</h2>
+  <section v-if="activeTab === 'regionalFinals'" class="tab-panel">
     <PlayoffBracket :matches="regionalFinalsMatches" :teams="teams" />
   </section>
 
-  <section v-if="activeTab === 'calendar'">
-    <h2>Calendrier</h2>
+  <section v-if="activeTab === 'calendar'" class="tab-panel">
     <div class="table-scroll">
     <table v-if="sortedMatches.length">
       <thead>
@@ -145,7 +174,7 @@
     </details>
   </section>
 
-  <p v-if="error" style="color:#ff6b6b">{{ error }}</p>
+  <p v-if="error" class="error">{{ error }}</p>
 </template>
 
 <script setup>
@@ -155,6 +184,7 @@ import StandingsTable from '../components/StandingsTable.vue'
 import HeadToHeadTable from '../components/HeadToHeadTable.vue'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
 import { leagueColor } from '../leagueColors'
+import { longDay } from '../format'
 import { canSave, kickoff, toEditForm, toMatchPayload } from '../matchEdit'
 import { useSort } from '../composables/useSort'
 import MatchEditCells from '../components/MatchEditCells.vue'
@@ -174,6 +204,26 @@ const activeTab = ref('standings')
 
 const playoffMatches = computed(() => matches.value.filter(m => m.phase === 'PLAYOFFS' && !(m.bracketSide ?? '').startsWith('REGIONAL_')))
 const regionalFinalsMatches = computed(() => matches.value.filter(m => (m.bracketSide ?? '').startsWith('REGIONAL_')))
+
+const tabs = computed(() => [
+  { key: 'standings', label: 'Classement', icon: '📊' },
+  { key: 'bracket', label: 'Bracket', icon: '🏆' },
+  ...(regionalFinalsMatches.value.length ? [{ key: 'regionalFinals', label: 'Regional Finals', icon: '🌏' }] : []),
+  { key: 'h2h', label: 'Confrontations', icon: '⚔️' },
+  { key: 'calendar', label: 'Calendrier', icon: '📅' }
+])
+
+const playedCount = computed(() => matches.value.filter(m => m.status === 'COMPLETED').length)
+const progress = computed(() => (matches.value.length ? Math.round((playedCount.value / matches.value.length) * 100) : 0))
+const teamCount = computed(() => new Set(matches.value.flatMap(m => [m.team1Id, m.team2Id]).filter(id => id != null)).size)
+const nextMatch = computed(() =>
+  matches.value.filter(m => m.status !== 'COMPLETED').sort((a, b) => kickoff(a).localeCompare(kickoff(b)))[0] ?? null
+)
+const champion = computed(() => {
+  const final = matches.value.find(m => m.bracketSide === 'GRAND_FINAL' && m.status === 'COMPLETED')
+  if (!final) return null
+  return final.score1 > final.score2 ? final.team1Code : final.team2Code
+})
 
 const { toggleSort, sortArrow, sortList } = useSort('date', kickoff)
 
@@ -292,9 +342,9 @@ const swissStandings = ref([])
 const standingsPanels = computed(() => {
   const panels = groupedData.value
     .filter(g => !(g.id === null && g.standings.length === 0 && swissStandings.value.length > 0))
-    .map(g => ({ key: g.id ?? 'all', name: g.name, rows: g.standings }))
+    .map(g => ({ key: g.id ?? 'all', name: g.name, rows: g.standings, matches: g.matches }))
   if (swissStandings.value.length) {
-    panels.push({ key: 'swiss', name: 'Phase suisse', rows: swissStandings.value })
+    panels.push({ key: 'swiss', name: 'Phase suisse', rows: swissStandings.value, matches: matches.value.filter(m => m.bracketSide === 'SWISS_STAGE') })
   }
   return panels
 })
@@ -320,7 +370,7 @@ async function load() {
     const groupMatches = matchList.filter(m =>
       m.phase === 'REGULAR_SEASON' && (g.id == null || m.groupId === g.id)
     )
-    return { ...g, standings: standingRows, legs: buildLegCells(groupMatches) }
+    return { ...g, standings: standingRows, matches: groupMatches, legs: buildLegCells(groupMatches) }
   }))
 
   swissStandings.value = computeSwissStandings(
@@ -370,41 +420,150 @@ onMounted(initialLoad)
 </script>
 
 <style scoped>
-.tabs {
+.back {
+  display: inline-block;
+  margin-top: 22px;
+  font-size: 0.88em;
+  color: var(--text-muted);
+}
+.back:hover {
+  color: var(--accent);
+}
+.hero {
+  position: relative;
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 14px 0 22px;
+  padding: 26px 28px;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(500px 220px at 0% 0%, color-mix(in srgb, var(--league-color) 28%, transparent), transparent 70%),
+    linear-gradient(135deg, var(--panel), var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--league-color) 30%, var(--border));
+  box-shadow: var(--shadow);
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--league-color), transparent);
+}
+.hero h1 {
+  margin: 10px 0 6px;
+}
+.hero-sub {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92em;
+}
+.hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 130px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border);
+}
+.stat-value {
+  font-family: "Outfit", sans-serif;
+  font-weight: 800;
+  font-size: 1.5em;
+  line-height: 1.1;
+}
+.stat-value.small {
+  font-size: 1.1em;
+  padding: 4px 0 3px;
+}
+.stat-total {
+  font-size: 0.6em;
+  color: var(--text-dim);
+}
+.stat-label {
+  font-size: 0.74em;
+  color: var(--text-muted);
+}
+.champion-stat {
+  border-color: rgba(245, 196, 81, 0.45);
+  background: rgba(245, 196, 81, 0.08);
+}
+.champion-stat .stat-value {
+  color: var(--gold-bright);
+}
+.progress {
+  display: block;
+  height: 5px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--league-color);
+}
+.tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
   gap: 4px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  padding: 5px;
+  margin-bottom: 22px;
+  border-radius: 999px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
 }
 .tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   background: none;
-  border: none;
-  border-bottom: 3px solid transparent;
-  border-radius: 0;
   color: var(--text-muted);
-  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 0.9em;
+  padding: 8px 16px;
+  box-shadow: none;
 }
 .tabs button:hover {
-  color: var(--gold-bright);
-  background: rgba(200, 170, 110, 0.06);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+  filter: none;
 }
 .tabs button.active {
-  color: var(--gold-bright);
-  border-bottom-color: var(--gold);
+  color: #0a0c18;
+  background: var(--accent-grad);
+  box-shadow: 0 6px 18px -8px rgba(129, 140, 248, 0.9);
 }
-.league-badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.5em;
-  letter-spacing: 0.03em;
-  vertical-align: middle;
-  margin-right: 10px;
-  color: var(--league-color);
-  background: color-mix(in srgb, var(--league-color) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--league-color) 45%, transparent);
-  -webkit-text-fill-color: var(--league-color);
+.tab-panel {
+  animation: fade-in 0.25s ease;
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.hint {
+  font-size: 0.86em;
+  color: var(--text-muted);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(129, 140, 248, 0.08);
+  border: 1px solid rgba(129, 140, 248, 0.2);
+  margin: 0 0 20px;
+}
+.hint strong {
+  color: var(--text);
 }
 .playoff-options {
   margin-bottom: 24px;
@@ -414,37 +573,55 @@ onMounted(initialLoad)
   color: var(--text-muted);
   margin-bottom: 8px;
 }
+.playoff-options .inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 .group-panels {
   display: flex;
   flex-wrap: wrap;
-  gap: 28px;
+  gap: 24px;
 }
 .group-panel {
-  flex: 1 1 420px;
+  flex: 1 1 460px;
   min-width: 0;
 }
-.group-panel h3 {
-  color: var(--gold);
-  font-size: 0.95em;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 10px;
+.group-panel h3,
+.group-block > h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05em;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+.group-panel h3::before,
+.group-block > h3::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  box-shadow: 0 0 10px var(--accent-2);
 }
 .group-block {
   margin-bottom: 32px;
 }
-.group-block > h3 {
-  color: var(--gold);
-  font-size: 1.05em;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 12px;
-}
 .group-panel h4 {
   color: var(--text-muted);
-  font-size: 0.82em;
+  font-size: 0.8em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 8px;
+  letter-spacing: 0.06em;
+  margin: 0 0 8px;
+}
+@media (max-width: 640px) {
+  .hero {
+    padding: 20px;
+  }
+  .tabs {
+    display: flex;
+    border-radius: var(--radius);
+  }
 }
 </style>
