@@ -1,0 +1,12 @@
+-- Anomalie decouverte en verifiant les groupes LPL (V8) : le match id 179
+-- ('LNG' vs 'LGD', W5, 2026-08-20) oppose une equipe de Group Nirvana (LNG)
+-- a une equipe de Group Ascend (LGD), ce qui est structurellement impossible
+-- (Leaguepedia : Ascend et Nirvana ne se rencontrent jamais en saison
+-- reguliere, chaque groupe joue uniquement en interne). C'est tres
+-- probablement une erreur de saisie dans le fichier Excel source (LNG a
+-- deja exactement ses 6 matchs reels de Group Nirvana par ailleurs, tous
+-- coherents avec Leaguepedia). On ne supprime pas le match (donnee de
+-- l'utilisateur, resultat peut-etre volontaire) mais on ne le rattache a
+-- aucun groupe pour eviter de fausser les classements Group Ascend / Group
+-- Nirvana. A verifier manuellement si besoin.
+UPDATE match SET competition_group_id = NULL WHERE id = 179;
