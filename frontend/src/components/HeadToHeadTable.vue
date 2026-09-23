@@ -78,6 +78,7 @@ function cellClass(row, col) {
   border-collapse: collapse;
   width: auto;
   margin: 0 auto;
+  border-radius: var(--radius);
 }
 .h2h-table th,
 .h2h-table td {
@@ -85,9 +86,6 @@ function cellClass(row, col) {
   text-align: center;
   padding: 7px 9px;
   font-size: 0.84em;
-}
-.h2h-table {
-  border-radius: var(--radius);
 }
 .corner {
   background: transparent;

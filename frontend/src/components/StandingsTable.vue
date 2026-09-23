@@ -259,7 +259,7 @@ function diffTone(row) {
 }
 .pip.lost {
   color: #fff;
-  background: rgba(251, 113, 133, 0.75);
+  background: #be123c;
 }
 @media (max-width: 720px) {
   .rate-col {

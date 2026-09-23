@@ -109,34 +109,34 @@ function byKickoff(a, b) {
  */
 function winnerLinks(matches) {
   const ids = new Set(matches.map(m => m.id))
-  const links = []
-  const hasExplicit = new Set()
-  for (const m of matches) {
-    if (m.nextMatchId != null && ids.has(m.nextMatchId)) {
-      links.push({ from: m.id, to: m.nextMatchId, slot: m.nextMatchSlot })
-      hasExplicit.add(m.id)
-    }
-  }
+  const links = matches
+    .filter(m => m.nextMatchId != null && ids.has(m.nextMatchId))
+    .map(m => ({ from: m.id, to: m.nextMatchId, slot: m.nextMatchSlot }))
+  const linked = new Set(links.map(l => l.from))
   const fedSlots = new Set(links.map(l => `${l.to}:${l.slot}`))
 
-  const sorted = [...matches].sort(byKickoff)
   const lastMatchOf = new Map()
-  for (const m of sorted) {
+  for (const m of [...matches].sort(byKickoff)) {
     for (const slot of [1, 2]) {
-      const teamId = slot === 1 ? m.team1Id : m.team2Id
+      const teamId = teamIdAt(m, slot)
       if (teamId == null) continue
       const prev = lastMatchOf.get(teamId)
-      if (prev && !hasExplicit.has(prev.id) && !fedSlots.has(`${m.id}:${slot}`)) {
-        const prevTeamSlot = prev.team1Id === teamId ? 1 : 2
-        if (winnerSlot(prev) === prevTeamSlot) {
-          links.push({ from: prev.id, to: m.id, slot, inferred: true })
-          hasExplicit.add(prev.id)
-        }
-      }
       lastMatchOf.set(teamId, m)
+      if (!prev || linked.has(prev.id) || fedSlots.has(`${m.id}:${slot}`)) continue
+      if (teamIdAt(prev, winnerSlot(prev)) === teamId) {
+        links.push({ from: prev.id, to: m.id, slot, inferred: true })
+        linked.add(prev.id)
+      }
     }
   }
   return links
+}
+
+/** Equipe a la place 1 ou 2 d'un match (null si place vide ou inconnue). */
+function teamIdAt(match, slot) {
+  if (slot === 1) return match.team1Id
+  if (slot === 2) return match.team2Id
+  return null
 }
 
 function loserLinks(matches) {
@@ -156,7 +156,7 @@ function laneColumns(laneMatches) {
   }
   const rounds = [...byRound.entries()].map(([label, ms]) => ({
     labels: [label],
-    start: ms.reduce((min, m) => (kickoff(m) < min ? kickoff(m) : min), kickoff(ms[0])),
+    start: ms.map(kickoff).sort()[0],
     matches: ms
   })).sort((a, b) => a.start.localeCompare(b.start))
 
@@ -330,7 +330,7 @@ function buildTreeBoard(key, label, matches) {
       id: `${l.from}-${l.to}`,
       d: edgePath(pos.get(l.from), pos.get(l.to)),
       done: slot != null,
-      teamId: slot === 1 ? from.team1Id : slot === 2 ? from.team2Id : null
+      teamId: teamIdAt(from, slot)
     }
   })
 
