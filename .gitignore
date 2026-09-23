@@ -2,3 +2,4 @@
 *.log
 .idea/
 Claude outputs/
+__pycache__/
