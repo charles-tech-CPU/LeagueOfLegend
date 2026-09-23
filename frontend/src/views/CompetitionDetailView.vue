@@ -67,15 +67,15 @@
       </thead>
       <tbody>
         <tr v-for="m in sortedMatches" :key="m.id" :class="{ 'row-scheduled': m.status === 'SCHEDULED' }">
-          <td><input class="date-input" type="date" v-model="edits[m.id].date" /></td>
-          <td><input class="time-input" type="time" v-model="edits[m.id].time" /></td>
+          <td><input v-model="edits[m.id].date" class="date-input" type="date" /></td>
+          <td><input v-model="edits[m.id].time" class="time-input" type="time" /></td>
           <td>
             <select v-model="edits[m.id].phase">
               <option value="REGULAR_SEASON">Saison rég.</option>
               <option value="PLAYOFFS">Playoffs</option>
             </select>
           </td>
-          <td><input class="round-input" v-model="edits[m.id].roundLabel" /></td>
+          <td><input v-model="edits[m.id].roundLabel" class="round-input" /></td>
           <td>
             <select v-model="edits[m.id].bestOf">
               <option value="BO1">BO1</option>
@@ -91,10 +91,10 @@
             </select>
           </td>
           <td>
-            <input class="score-input" type="number" min="0" v-model.number="edits[m.id].score1" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
+            <input v-model.number="edits[m.id].score1" class="score-input" type="number" min="0" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
           </td>
           <td>
-            <input class="score-input" type="number" min="0" v-model.number="edits[m.id].score2" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
+            <input v-model.number="edits[m.id].score2" class="score-input" type="number" min="0" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
           </td>
           <td class="team-cell">
             <img v-if="hasLogo(edits[m.id].team2Id)" class="team-logo" :src="teamLogoUrl(edits[m.id].team2Id)" alt="" />
@@ -109,7 +109,7 @@
             </span>
           </td>
           <td>
-            <button @click="saveMatch(m)" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id">Enregistrer</button>
+            <button :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" @click="saveMatch(m)">Enregistrer</button>
           </td>
         </tr>
       </tbody>
@@ -135,8 +135,8 @@
         <option value="BO3">BO3</option>
         <option value="BO5">BO5</option>
       </select>
-      <input class="score-input" type="number" min="0" v-model.number="newMatch.score1" placeholder="S1" />
-      <input class="score-input" type="number" min="0" v-model.number="newMatch.score2" placeholder="S2" />
+      <input v-model.number="newMatch.score1" class="score-input" type="number" min="0" placeholder="S1" />
+      <input v-model.number="newMatch.score2" class="score-input" type="number" min="0" placeholder="S2" />
       <button type="submit">Ajouter</button>
     </form>
 

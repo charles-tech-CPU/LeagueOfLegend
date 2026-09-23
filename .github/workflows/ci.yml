@@ -46,5 +46,8 @@ jobs:
       - name: Installation des dependances
         run: npm ci
 
+      - name: Lint (ESLint)
+        run: npm run lint
+
       - name: Build de production
         run: npm run build
