@@ -6,11 +6,10 @@ import com.charles.lolresults.dto.CompetitionDto;
 import com.charles.lolresults.repository.CompetitionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.Comparator;
 import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/competitions")
@@ -25,15 +24,16 @@ public class CompetitionController {
     @GetMapping
     public List<CompetitionDto> findAll() {
         return competitionRepository.findAll().stream()
-                .sorted(Comparator.comparing(Competition::getSeason).reversed()
-                        .thenComparing(Competition::getCode))
+                .sorted(Comparator.comparing(Competition::getSeason).reversed().thenComparing(Competition::getCode))
                 .map(CompetitionDto::from)
                 .toList();
     }
 
     @GetMapping("/{id}")
     public CompetitionDto findOne(@PathVariable Long id) {
-        return competitionRepository.findById(id).map(CompetitionDto::from)
+        return competitionRepository
+                .findById(id)
+                .map(CompetitionDto::from)
                 .orElseThrow(() -> new EntityNotFoundException("Competition introuvable : " + id));
     }
 

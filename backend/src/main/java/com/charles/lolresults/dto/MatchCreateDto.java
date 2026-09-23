@@ -3,7 +3,6 @@ package com.charles.lolresults.dto;
 import com.charles.lolresults.domain.BestOf;
 import com.charles.lolresults.domain.MatchPhase;
 import jakarta.validation.constraints.NotNull;
-
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -32,6 +31,4 @@ public record MatchCreateDto(
         Long nextMatchId,
         Integer nextMatchSlot,
         Long loserNextMatchId,
-        Integer loserNextMatchSlot
-) {
-}
+        Integer loserNextMatchSlot) {}

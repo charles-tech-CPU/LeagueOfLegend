@@ -8,6 +8,4 @@ public record StandingRowDto(
         int seriesWon,
         int seriesLost,
         int gamesWon,
-        int gamesLost
-) {
-}
+        int gamesLost) {}

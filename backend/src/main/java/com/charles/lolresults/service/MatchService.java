@@ -8,11 +8,10 @@ import com.charles.lolresults.repository.CompetitionRepository;
 import com.charles.lolresults.repository.MatchRepository;
 import com.charles.lolresults.repository.TeamRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.Objects;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
@@ -23,10 +22,11 @@ public class MatchService {
     private final CompetitionGroupRepository groupRepository;
     private final TeamRepository teamRepository;
 
-    public MatchService(MatchRepository matchRepository,
-                         CompetitionRepository competitionRepository,
-                         CompetitionGroupRepository groupRepository,
-                         TeamRepository teamRepository) {
+    public MatchService(
+            MatchRepository matchRepository,
+            CompetitionRepository competitionRepository,
+            CompetitionGroupRepository groupRepository,
+            TeamRepository teamRepository) {
         this.matchRepository = matchRepository;
         this.competitionRepository = competitionRepository;
         this.groupRepository = groupRepository;
@@ -35,21 +35,24 @@ public class MatchService {
 
     @Transactional(readOnly = true)
     public List<MatchDto> findByCompetition(Long competitionId) {
-        return matchRepository.findByCompetitionIdOrderByDateAscTimeAsc(competitionId)
-                .stream().map(MatchDto::from).toList();
+        return matchRepository.findByCompetitionIdOrderByDateAscTimeAsc(competitionId).stream()
+                .map(MatchDto::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MatchDto> findByTeam(Long teamId) {
-        return matchRepository.findByTeam1_IdOrTeam2_IdOrderByDateDesc(teamId, teamId)
-                .stream().map(MatchDto::from).toList();
+        return matchRepository.findByTeam1_IdOrTeam2_IdOrderByDateDesc(teamId, teamId).stream()
+                .map(MatchDto::from)
+                .toList();
     }
 
     /** Toutes competitions confondues : sert la page "A venir" (saisie de resultats). */
     @Transactional(readOnly = true)
     public List<MatchDto> findByStatus(MatchStatus status) {
-        return matchRepository.findByStatusOrderByDateAscTimeAsc(status)
-                .stream().map(MatchDto::from).toList();
+        return matchRepository.findByStatusOrderByDateAscTimeAsc(status).stream()
+                .map(MatchDto::from)
+                .toList();
     }
 
     public MatchDto create(MatchCreateDto dto) {
@@ -61,7 +64,8 @@ public class MatchService {
     }
 
     public MatchDto update(Long id, MatchCreateDto dto) {
-        Match match = matchRepository.findById(id)
+        Match match = matchRepository
+                .findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Match introuvable : " + id));
         applyFields(match, dto);
         Match saved = matchRepository.save(match);
@@ -74,12 +78,14 @@ public class MatchService {
     }
 
     private void applyFields(Match match, MatchCreateDto dto) {
-        Competition competition = competitionRepository.findById(dto.competitionId())
+        Competition competition = competitionRepository
+                .findById(dto.competitionId())
                 .orElseThrow(() -> new EntityNotFoundException("Competition introuvable : " + dto.competitionId()));
 
         CompetitionGroup group = null;
         if (dto.groupId() != null) {
-            group = groupRepository.findById(dto.groupId())
+            group = groupRepository
+                    .findById(dto.groupId())
                     .orElseThrow(() -> new EntityNotFoundException("Groupe introuvable : " + dto.groupId()));
         }
 
@@ -99,17 +105,18 @@ public class MatchService {
         match.setNextMatchSlot(dto.nextMatchSlot());
         match.setLoserNextMatch(findMatchOrNull(dto.loserNextMatchId()));
         match.setLoserNextMatchSlot(dto.loserNextMatchSlot());
-        match.setStatus(match.getTeam1() != null && match.getTeam2() != null
-                && dto.score1() != null && dto.score2() != null
-                ? MatchStatus.COMPLETED
-                : MatchStatus.SCHEDULED);
+        match.setStatus(
+                match.getTeam1() != null && match.getTeam2() != null && dto.score1() != null && dto.score2() != null
+                        ? MatchStatus.COMPLETED
+                        : MatchStatus.SCHEDULED);
     }
 
     private Team findTeamOrNull(Long teamId) {
         if (teamId == null) {
             return null;
         }
-        return teamRepository.findById(teamId)
+        return teamRepository
+                .findById(teamId)
                 .orElseThrow(() -> new EntityNotFoundException("Equipe introuvable : " + teamId));
     }
 
@@ -117,7 +124,8 @@ public class MatchService {
         if (matchId == null) {
             return null;
         }
-        return matchRepository.findById(matchId)
+        return matchRepository
+                .findById(matchId)
                 .orElseThrow(() -> new EntityNotFoundException("Match introuvable : " + matchId));
     }
 

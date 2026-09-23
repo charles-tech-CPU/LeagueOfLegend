@@ -6,15 +6,14 @@ import com.charles.lolresults.dto.TeamDto;
 import com.charles.lolresults.repository.TeamRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
+import java.io.IOException;
+import java.util.Comparator;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
-import java.util.Comparator;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/teams")
@@ -36,7 +35,9 @@ public class TeamController {
 
     @GetMapping("/{id}")
     public TeamDto findOne(@PathVariable Long id) {
-        return teamRepository.findById(id).map(TeamDto::from)
+        return teamRepository
+                .findById(id)
+                .map(TeamDto::from)
                 .orElseThrow(() -> new EntityNotFoundException("Equipe introuvable : " + id));
     }
 
@@ -49,7 +50,8 @@ public class TeamController {
 
     @PutMapping("/{id}")
     public TeamDto update(@PathVariable Long id, @Valid @RequestBody TeamCreateDto dto) {
-        Team team = teamRepository.findById(id)
+        Team team = teamRepository
+                .findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Equipe introuvable : " + id));
         team.setCode(dto.code());
         team.setName(dto.name());
@@ -65,7 +67,8 @@ public class TeamController {
 
     @GetMapping("/{id}/logo")
     public ResponseEntity<byte[]> logo(@PathVariable Long id) {
-        Team team = teamRepository.findById(id)
+        Team team = teamRepository
+                .findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Equipe introuvable : " + id));
         if (team.getLogo() == null) {
             return ResponseEntity.notFound().build();
@@ -79,7 +82,8 @@ public class TeamController {
     @PostMapping("/{id}/logo")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void uploadLogo(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
-        Team team = teamRepository.findById(id)
+        Team team = teamRepository
+                .findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Equipe introuvable : " + id));
         team.setLogo(file.getBytes());
         team.setLogoContentType(file.getContentType());

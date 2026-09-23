@@ -5,10 +5,9 @@ import com.charles.lolresults.dto.MatchCreateDto;
 import com.charles.lolresults.dto.MatchDto;
 import com.charles.lolresults.service.MatchService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/matches")
@@ -22,9 +21,10 @@ public class MatchController {
 
     /** GET /api/matches?competitionId=1  ou  GET /api/matches?teamId=3  ou  GET /api/matches?status=SCHEDULED */
     @GetMapping
-    public List<MatchDto> find(@RequestParam(required = false) Long competitionId,
-                                @RequestParam(required = false) Long teamId,
-                                @RequestParam(required = false) MatchStatus status) {
+    public List<MatchDto> find(
+            @RequestParam(required = false) Long competitionId,
+            @RequestParam(required = false) Long teamId,
+            @RequestParam(required = false) MatchStatus status) {
         if (competitionId != null) {
             return matchService.findByCompetition(competitionId);
         }

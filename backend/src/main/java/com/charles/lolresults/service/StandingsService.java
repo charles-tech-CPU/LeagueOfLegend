@@ -7,13 +7,12 @@ import com.charles.lolresults.domain.Team;
 import com.charles.lolresults.dto.HeadToHeadCellDto;
 import com.charles.lolresults.dto.StandingRowDto;
 import com.charles.lolresults.repository.MatchRepository;
-import org.springframework.stereotype.Service;
-
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.stereotype.Service;
 
 /**
  * Classement et tete-a-tete ne sont jamais stockes : ils sont toujours
@@ -41,10 +40,11 @@ public class StandingsService {
 
         return byTeam.values().stream()
                 .map(TeamTally::toDto)
-                .sorted(Comparator
-                        .comparingInt(StandingRowDto::seriesWon).reversed()
+                .sorted(Comparator.comparingInt(StandingRowDto::seriesWon)
+                        .reversed()
                         .thenComparing(StandingRowDto::seriesLost)
-                        .thenComparing(Comparator.comparingInt(StandingRowDto::gamesWon).reversed()))
+                        .thenComparing(Comparator.comparingInt(StandingRowDto::gamesWon)
+                                .reversed()))
                 .toList();
     }
 
@@ -57,8 +57,8 @@ public class StandingsService {
         }
 
         List<HeadToHeadCellDto> result = new ArrayList<>();
-        tally.forEach((teamAId, opponents) -> opponents.forEach((teamBId, wl) ->
-                result.add(new HeadToHeadCellDto(teamAId, teamBId, wl[0], wl[1]))));
+        tally.forEach((teamAId, opponents) ->
+                opponents.forEach((teamBId, wl) -> result.add(new HeadToHeadCellDto(teamAId, teamBId, wl[0], wl[1]))));
         return result;
     }
 
@@ -69,10 +69,12 @@ public class StandingsService {
      * ne doivent jamais influencer un classement de saison reguliere.
      */
     private List<Match> playedMatches(Long competitionId, Long groupId) {
-        return matchRepository.findByCompetitionIdAndStatusOrderByDateAscTimeAsc(competitionId, MatchStatus.COMPLETED)
+        return matchRepository
+                .findByCompetitionIdAndStatusOrderByDateAscTimeAsc(competitionId, MatchStatus.COMPLETED)
                 .stream()
                 .filter(m -> m.getPhase() == MatchPhase.REGULAR_SEASON)
-                .filter(m -> groupId == null || (m.getGroup() != null && groupId.equals(m.getGroup().getId())))
+                .filter(m -> groupId == null
+                        || (m.getGroup() != null && groupId.equals(m.getGroup().getId())))
                 .toList();
     }
 
@@ -84,8 +86,8 @@ public class StandingsService {
         if (scoreA == null || scoreB == null) {
             return;
         }
-        int[] wl = tally.computeIfAbsent(teamAId, id -> new LinkedHashMap<>())
-                .computeIfAbsent(teamBId, id -> new int[2]);
+        int[] wl =
+                tally.computeIfAbsent(teamAId, id -> new LinkedHashMap<>()).computeIfAbsent(teamBId, id -> new int[2]);
         if (scoreA > scoreB) {
             wl[0]++;
         } else {
@@ -119,8 +121,15 @@ public class StandingsService {
         }
 
         private StandingRowDto toDto() {
-            return new StandingRowDto(team.getId(), team.getCode(), team.getName(), team.getLogo() != null,
-                    seriesWon, seriesLost, gamesWon, gamesLost);
+            return new StandingRowDto(
+                    team.getId(),
+                    team.getCode(),
+                    team.getName(),
+                    team.getLogo() != null,
+                    seriesWon,
+                    seriesLost,
+                    gamesWon,
+                    gamesLost);
         }
     }
 }

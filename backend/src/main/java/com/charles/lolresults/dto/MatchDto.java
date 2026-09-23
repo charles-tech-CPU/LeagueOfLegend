@@ -4,7 +4,6 @@ import com.charles.lolresults.domain.BestOf;
 import com.charles.lolresults.domain.Match;
 import com.charles.lolresults.domain.MatchPhase;
 import com.charles.lolresults.domain.MatchStatus;
-
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -32,8 +31,7 @@ public record MatchDto(
         Long nextMatchId,
         Integer nextMatchSlot,
         Long loserNextMatchId,
-        Integer loserNextMatchSlot
-) {
+        Integer loserNextMatchSlot) {
     public static MatchDto from(Match m) {
         return new MatchDto(
                 m.getId(),
@@ -59,7 +57,6 @@ public record MatchDto(
                 m.getNextMatch() != null ? m.getNextMatch().getId() : null,
                 m.getNextMatchSlot(),
                 m.getLoserNextMatch() != null ? m.getLoserNextMatch().getId() : null,
-                m.getLoserNextMatchSlot()
-        );
+                m.getLoserNextMatchSlot());
     }
 }

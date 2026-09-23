@@ -5,10 +5,4 @@ package com.charles.lolresults.dto;
  * (seriesWon-seriesLost du point de vue de teamA). Absent de la liste
  * si les deux equipes ne se sont pas encore affrontees.
  */
-public record HeadToHeadCellDto(
-        Long teamAId,
-        Long teamBId,
-        int seriesWon,
-        int seriesLost
-) {
-}
+public record HeadToHeadCellDto(Long teamAId, Long teamBId, int seriesWon, int seriesLost) {}

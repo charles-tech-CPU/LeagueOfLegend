@@ -1,12 +1,11 @@
 package com.charles.lolresults.domain;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.time.LocalDate;
-import java.time.LocalTime;
 
 /**
  * Un match (une serie Bo1/Bo3/Bo5) entre deux equipes, dans une competition,
