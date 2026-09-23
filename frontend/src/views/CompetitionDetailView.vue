@@ -52,7 +52,7 @@
     <table v-if="sortedMatches.length">
       <thead>
         <tr>
-          <th class="sortable" tabindex="0" @click="toggleDateSort" @keydown.enter="toggleDateSort">Date <span class="sort-arrow">{{ dateSortDir === 'asc' ? '▲' : '▼' }}</span></th>
+          <th class="sortable" tabindex="0" @click="toggleSort('date')" @keydown.enter="toggleSort('date')">Date <span class="sort-arrow">{{ sortArrow('date') }}</span></th>
           <th>Heure</th>
           <th>Phase</th>
           <th>Round</th>
@@ -67,49 +67,14 @@
       </thead>
       <tbody>
         <tr v-for="m in sortedMatches" :key="m.id" :class="{ 'row-scheduled': m.status === 'SCHEDULED' }">
-          <td><input v-model="edits[m.id].date" class="date-input" type="date" aria-label="Date" /></td>
-          <td><input v-model="edits[m.id].time" class="time-input" type="time" aria-label="Heure" /></td>
-          <td>
-            <select v-model="edits[m.id].phase" aria-label="Phase">
-              <option value="REGULAR_SEASON">Saison rég.</option>
-              <option value="PLAYOFFS">Playoffs</option>
-            </select>
-          </td>
-          <td><input v-model="edits[m.id].roundLabel" class="round-input" aria-label="Round" /></td>
-          <td>
-            <select v-model="edits[m.id].bestOf" aria-label="Format (best of)">
-              <option value="BO1">BO1</option>
-              <option value="BO3">BO3</option>
-              <option value="BO5">BO5</option>
-            </select>
-          </td>
-          <td class="team-cell">
-            <img v-if="hasLogo(edits[m.id].team1Id)" class="team-logo" :src="teamLogoUrl(edits[m.id].team1Id)" alt="" />
-            <select v-model.number="edits[m.id].team1Id" aria-label="Équipe 1">
-              <option :value="null">À déterminer</option>
-              <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.code }}</option>
-            </select>
-          </td>
-          <td>
-            <input v-model.number="edits[m.id].score1" class="score-input" type="number" min="0" aria-label="Score équipe 1" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
-          </td>
-          <td>
-            <input v-model.number="edits[m.id].score2" class="score-input" type="number" min="0" aria-label="Score équipe 2" :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" />
-          </td>
-          <td class="team-cell">
-            <img v-if="hasLogo(edits[m.id].team2Id)" class="team-logo" :src="teamLogoUrl(edits[m.id].team2Id)" alt="" />
-            <select v-model.number="edits[m.id].team2Id" aria-label="Équipe 2">
-              <option :value="null">À déterminer</option>
-              <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.code }}</option>
-            </select>
-          </td>
+          <MatchEditCells v-model="edits[m.id]" :teams="teams" />
           <td>
             <span class="status-badge" :class="m.status === 'COMPLETED' ? 'completed' : 'scheduled'">
               {{ m.status === 'COMPLETED' ? 'Joué' : 'À venir' }}
             </span>
           </td>
           <td>
-            <button :disabled="!edits[m.id].team1Id || !edits[m.id].team2Id" @click="saveMatch(m)">Enregistrer</button>
+            <button :disabled="!canSave(edits[m.id])" @click="saveMatch(m)">Enregistrer</button>
           </td>
         </tr>
       </tbody>
@@ -185,11 +150,14 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import api, { teamLogoUrl } from '../services/api'
+import api from '../services/api'
 import StandingsTable from '../components/StandingsTable.vue'
 import HeadToHeadTable from '../components/HeadToHeadTable.vue'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
 import { leagueColor } from '../leagueColors'
+import { canSave, kickoff, toEditForm, toMatchPayload } from '../matchEdit'
+import { useSort } from '../composables/useSort'
+import MatchEditCells from '../components/MatchEditCells.vue'
 
 const props = defineProps({
   id: { type: [String, Number], required: true }
@@ -203,33 +171,13 @@ const loaded = ref(false)
 const error = ref('')
 const edits = reactive({})
 const activeTab = ref('standings')
-const dateSortDir = ref('asc')
 
 const playoffMatches = computed(() => matches.value.filter(m => m.phase === 'PLAYOFFS' && !(m.bracketSide ?? '').startsWith('REGIONAL_')))
 const regionalFinalsMatches = computed(() => matches.value.filter(m => (m.bracketSide ?? '').startsWith('REGIONAL_')))
 
-const sortedMatches = computed(() => {
-  const list = [...matches.value]
-  list.sort((a, b) => {
-    const ka = a.date + (a.time ?? '')
-    const kb = b.date + (b.time ?? '')
-    const cmp = ka.localeCompare(kb)
-    return dateSortDir.value === 'asc' ? cmp : -cmp
-  })
-  return list
-})
+const { toggleSort, sortArrow, sortList } = useSort('date', kickoff)
 
-function toggleDateSort() {
-  dateSortDir.value = dateSortDir.value === 'asc' ? 'desc' : 'asc'
-}
-
-function hasLogo(teamId) {
-  return teams.value.find(t => t.id === teamId)?.hasLogo ?? false
-}
-
-function formatTime(t) {
-  return t ? t.slice(0, 5) : ''
-}
+const sortedMatches = computed(() => sortList(matches.value))
 
 function emptyNewMatch() {
   return {
@@ -381,43 +329,15 @@ async function load() {
   )
 
   for (const m of matchList) {
-    edits[m.id] = {
-      team1Id: m.team1Id,
-      team2Id: m.team2Id,
-      roundLabel: m.roundLabel,
-      date: m.date,
-      time: formatTime(m.time),
-      bestOf: m.bestOf,
-      phase: m.phase,
-      score1: m.score1,
-      score2: m.score2
-    }
+    edits[m.id] = toEditForm(m)
   }
   loaded.value = true
 }
 
 async function saveMatch(match) {
   error.value = ''
-  const edit = edits[match.id]
   try {
-    await api.updateMatch(match.id, {
-      competitionId: match.competitionId,
-      groupId: match.groupId,
-      roundLabel: edit.roundLabel,
-      date: edit.date,
-      time: edit.time || null,
-      bestOf: edit.bestOf,
-      team1Id: edit.team1Id,
-      team2Id: edit.team2Id,
-      score1: edit.score1,
-      score2: edit.score2,
-      phase: edit.phase,
-      bracketSide: match.bracketSide,
-      nextMatchId: match.nextMatchId,
-      nextMatchSlot: match.nextMatchSlot,
-      loserNextMatchId: match.loserNextMatchId,
-      loserNextMatchSlot: match.loserNextMatchSlot
-    })
+    await api.updateMatch(match.id, toMatchPayload(match, edits[match.id]))
     await load()
   } catch (e) {
     error.value = e.response?.data?.error ?? "Erreur lors de l'enregistrement du match."
@@ -427,24 +347,7 @@ async function saveMatch(match) {
 async function submitMatch() {
   error.value = ''
   try {
-    await api.createMatch({
-      competitionId: Number(props.id),
-      groupId: null,
-      roundLabel: newMatch.roundLabel,
-      date: newMatch.date,
-      time: newMatch.time || null,
-      bestOf: newMatch.bestOf,
-      team1Id: newMatch.team1Id,
-      team2Id: newMatch.team2Id,
-      score1: newMatch.score1,
-      score2: newMatch.score2,
-      phase: newMatch.phase,
-      bracketSide: newMatch.bracketSide,
-      nextMatchId: newMatch.nextMatchId,
-      nextMatchSlot: newMatch.nextMatchSlot,
-      loserNextMatchId: newMatch.loserNextMatchId,
-      loserNextMatchSlot: newMatch.loserNextMatchSlot
-    })
+    await api.createMatch(toMatchPayload({ ...newMatch, competitionId: Number(props.id), groupId: null }, newMatch))
     Object.assign(newMatch, emptyNewMatch())
     await load()
   } catch (e) {
@@ -488,70 +391,6 @@ onMounted(initialLoad)
 .tabs button.active {
   color: var(--gold-bright);
   border-bottom-color: var(--gold);
-}
-.sortable {
-  cursor: pointer;
-  user-select: none;
-}
-.sortable:hover {
-  color: var(--gold-bright);
-}
-.sort-arrow {
-  font-size: 0.9em;
-}
-.table-scroll {
-  overflow-x: auto;
-  /* Sort du conteneur centre (#app, max-width 1080px) pour utiliser toute la
-     largeur de la fenetre : le calendrier a trop de colonnes editables pour
-     tenir dans une largeur de contenu classique. */
-  width: 100vw;
-  position: relative;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
-  padding: 0 16px;
-}
-.table-scroll table {
-  width: auto;
-}
-.table-scroll th,
-.table-scroll td {
-  padding: 12px 10px;
-  font-size: 0.95em;
-}
-.date-input {
-  width: 130px;
-  padding: 9px 6px;
-}
-.time-input {
-  width: 84px;
-  padding: 9px 6px;
-}
-.round-input {
-  width: 70px;
-  padding: 9px 6px;
-}
-.table-scroll select {
-  padding: 9px 6px;
-}
-.team-cell {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-.team-cell select {
-  width: 88px;
-}
-.table-scroll .team-logo {
-  height: 24px;
-  max-width: 34px;
-  padding: 2px;
-}
-.table-scroll .score-input {
-  width: 56px;
-  padding: 9px 6px;
 }
 .league-badge {
   display: inline-block;

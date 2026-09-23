@@ -3,21 +3,25 @@ package com.charles.lolresults.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.charles.lolresults.domain.BestOf;
 import com.charles.lolresults.domain.Competition;
+import com.charles.lolresults.domain.CompetitionGroup;
 import com.charles.lolresults.domain.Match;
 import com.charles.lolresults.domain.MatchPhase;
 import com.charles.lolresults.domain.MatchStatus;
 import com.charles.lolresults.domain.Team;
 import com.charles.lolresults.dto.MatchCreateDto;
+import com.charles.lolresults.dto.MatchDto;
 import com.charles.lolresults.repository.CompetitionGroupRepository;
 import com.charles.lolresults.repository.CompetitionRepository;
 import com.charles.lolresults.repository.MatchRepository;
 import com.charles.lolresults.repository.TeamRepository;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -104,6 +108,114 @@ class MatchServiceTest {
 
         MatchCreateDto dto = playoffMatch(2, 0);
         assertThatThrownBy(() -> matchService.update(999L, dto)).isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void miseAJourDUnMatchExistantAvecVictoireDeLEquipe2() {
+        Match existing = new Match();
+        existing.setId(5L);
+        when(matchRepository.findById(5L)).thenReturn(Optional.of(existing));
+
+        MatchDto updated = matchService.update(5L, playoffMatch(1, 3));
+
+        assertThat(updated.status()).isEqualTo(MatchStatus.COMPLETED);
+        assertThat(nextMatch.getTeam1()).isSameAs(fnc);
+        assertThat(loserNextMatch.getTeam2()).isSameAs(g2);
+    }
+
+    @Test
+    void matchDeSaisonReguliereDansUnGroupeSansMatchSuivant() {
+        CompetitionGroup group = new CompetitionGroup();
+        group.setId(10L);
+        group.setName("Legend Group");
+        when(groupRepository.findById(10L)).thenReturn(Optional.of(group));
+
+        MatchDto created = matchService.create(regularMatch(10L, 2L, 1L));
+
+        assertThat(created.groupName()).isEqualTo("Legend Group");
+        assertThat(created.phase()).isEqualTo(MatchPhase.REGULAR_SEASON);
+        assertThat(created.team1Code()).isEqualTo("FNC");
+    }
+
+    @Test
+    void matchSansEquipesResteAVenir() {
+        MatchDto created = matchService.create(regularMatch(null, null, null));
+
+        assertThat(created.status()).isEqualTo(MatchStatus.SCHEDULED);
+        assertThat(created.team1Id()).isNull();
+    }
+
+    @Test
+    void referencesInconnuesLeventUneErreur() {
+        when(groupRepository.findById(10L)).thenReturn(Optional.empty());
+        when(teamRepository.findById(9L)).thenReturn(Optional.empty());
+        when(competitionRepository.findById(2L)).thenReturn(Optional.empty());
+        MatchCreateDto unknownGroup = regularMatch(10L, 1L, 2L);
+        MatchCreateDto unknownTeam = regularMatch(null, 9L, 2L);
+        MatchCreateDto unknownCompetition = new MatchCreateDto(
+                2L,
+                null,
+                "W1",
+                LocalDate.of(2026, 9, 1),
+                null,
+                BestOf.BO1,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        assertThatThrownBy(() -> matchService.create(unknownGroup)).isInstanceOf(EntityNotFoundException.class);
+        assertThatThrownBy(() -> matchService.create(unknownTeam)).isInstanceOf(EntityNotFoundException.class);
+        assertThatThrownBy(() -> matchService.create(unknownCompetition)).isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void recherchesEtSuppressionDeleguentAuRepository() {
+        Match match = new Match();
+        match.setCompetition(new Competition());
+        when(matchRepository.findByCompetitionIdOrderByDateAscTimeAsc(1L)).thenReturn(List.of(match));
+        when(matchRepository.findByTeam1_IdOrTeam2_IdOrderByDateDesc(1L, 1L)).thenReturn(List.of(match));
+        when(matchRepository.findByStatusOrderByDateAscTimeAsc(MatchStatus.SCHEDULED))
+                .thenReturn(List.of());
+
+        assertThat(matchService.findByCompetition(1L)).hasSize(1);
+        assertThat(matchService.findByTeam(1L)).hasSize(1);
+        assertThat(matchService.findByStatus(MatchStatus.SCHEDULED)).isEmpty();
+
+        matchService.delete(1L);
+        verify(matchRepository).deleteById(1L);
+    }
+
+    @Test
+    void unBo5SeGagneEnTroisManches() {
+        assertThat(BestOf.BO1.getGamesToWin()).isEqualTo(1);
+        assertThat(BestOf.BO5.getGamesToWin()).isEqualTo(3);
+    }
+
+    private static MatchCreateDto regularMatch(Long groupId, Long team1Id, Long team2Id) {
+        return new MatchCreateDto(
+                1L,
+                groupId,
+                "W1",
+                LocalDate.of(2026, 9, 1),
+                null,
+                BestOf.BO1,
+                team1Id,
+                team2Id,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     private static MatchCreateDto playoffMatch(Integer score1, Integer score2) {

@@ -93,6 +93,18 @@ class StandingsServiceTest {
                 .containsExactlyInAnyOrder(new HeadToHeadCellDto(1L, 2L, 1, 1), new HeadToHeadCellDto(2L, 1L, 1, 1));
     }
 
+    @Test
+    void unMatchSansScoreEstIgnore() {
+        Match withoutScore = match(g2, fnc, 2, 0, MatchPhase.REGULAR_SEASON);
+        withoutScore.setScore2(null);
+        givenPlayedMatches(withoutScore);
+
+        assertThat(standingsService.computeStandings(COMPETITION_ID, null))
+                .allSatisfy(
+                        row -> assertThat(row.seriesWon() + row.seriesLost()).isZero());
+        assertThat(standingsService.computeHeadToHead(COMPETITION_ID, null)).isEmpty();
+    }
+
     private void givenPlayedMatches(Match... matches) {
         when(matchRepository.findByCompetitionIdAndStatusOrderByDateAscTimeAsc(COMPETITION_ID, MatchStatus.COMPLETED))
                 .thenReturn(List.of(matches));

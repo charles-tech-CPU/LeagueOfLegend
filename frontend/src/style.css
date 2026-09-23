@@ -245,3 +245,41 @@ form.inline {
   border: 1px solid var(--border);
   border-radius: 8px;
 }
+
+/* En-tetes de tableau triables (voir composables/useSort.js) */
+.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortable:hover {
+  color: var(--gold-bright);
+}
+
+.sort-arrow {
+  font-size: 0.9em;
+}
+
+/* Tableau de matchs editables : sort du conteneur centre (#app, max-width
+   1080px) pour utiliser toute la largeur de la fenetre, car il a trop de
+   colonnes pour tenir dans une largeur de contenu classique. */
+.table-scroll {
+  overflow-x: auto;
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  padding: 0 16px;
+}
+
+.table-scroll table {
+  width: auto;
+}
+
+.table-scroll th,
+.table-scroll td {
+  padding: 12px 10px;
+  font-size: 0.95em;
+}

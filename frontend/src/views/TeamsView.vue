@@ -57,41 +57,19 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import api, { teamLogoUrl } from '../services/api'
+import { useSort } from '../composables/useSort'
 
 const teams = ref([])
 const loaded = ref(false)
 const error = ref('')
 const form = reactive({ code: '', name: '', region: '' })
 
-const sortBy = ref('name')
-const sortDir = ref('asc')
 const editingId = ref(null)
 const editForm = reactive({ code: '', name: '', region: '' })
 
-const sortedTeams = computed(() => {
-  const list = [...teams.value]
-  list.sort((a, b) => {
-    const va = (a[sortBy.value] ?? '').toString()
-    const vb = (b[sortBy.value] ?? '').toString()
-    const cmp = va.localeCompare(vb)
-    return sortDir.value === 'asc' ? cmp : -cmp
-  })
-  return list
-})
+const { toggleSort, sortArrow, sortList } = useSort('name', (team, field) => (team[field] ?? '').toString())
 
-function toggleSort(field) {
-  if (sortBy.value === field) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortBy.value = field
-    sortDir.value = 'asc'
-  }
-}
-
-function sortArrow(field) {
-  if (sortBy.value !== field) return ''
-  return sortDir.value === 'asc' ? '▲' : '▼'
-}
+const sortedTeams = computed(() => sortList(teams.value))
 
 function startEdit(team) {
   editingId.value = team.id
@@ -137,13 +115,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.sortable {
-  cursor: pointer;
-  user-select: none;
-}
-.sortable:hover {
-  color: var(--gold-bright);
-}
 .sort-arrow {
   font-size: 0.8em;
   color: var(--gold);

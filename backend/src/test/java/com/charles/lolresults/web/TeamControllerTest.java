@@ -8,8 +8,10 @@ import static org.mockito.Mockito.when;
 
 import com.charles.lolresults.domain.Team;
 import com.charles.lolresults.dto.TeamCreateDto;
+import com.charles.lolresults.dto.TeamDto;
 import com.charles.lolresults.repository.TeamRepository;
 import jakarta.persistence.EntityNotFoundException;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +30,39 @@ class TeamControllerTest {
 
     @InjectMocks
     private TeamController teamController;
+
+    @Test
+    void findAllTrieParNom() {
+        when(teamRepository.findAll())
+                .thenReturn(List.of(new Team("KC", "Karmine Corp", "EMEA"), new Team("FNC", "Fnatic", "EMEA")));
+
+        assertThat(teamController.findAll()).extracting(TeamDto::code).containsExactly("FNC", "KC");
+    }
+
+    @Test
+    void createEnregistreLEquipe() {
+        when(teamRepository.save(any(Team.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TeamDto created = teamController.create(new TeamCreateDto("G2", "G2 Esports", "EMEA"));
+
+        assertThat(created.name()).isEqualTo("G2 Esports");
+    }
+
+    @Test
+    void deleteSupprimeLEquipe() {
+        teamController.delete(1L);
+
+        verify(teamRepository).deleteById(1L);
+    }
+
+    @Test
+    void unLogoSansTypeEstServiEnBinaireGenerique() {
+        Team team = team();
+        team.setLogo(new byte[] {1});
+        when(teamRepository.findById(1L)).thenReturn(Optional.of(team));
+
+        assertThat(teamController.logo(1L).getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+    }
 
     @Test
     void findOneRenvoieLEquipe() {
