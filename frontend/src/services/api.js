@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // URL du backend Spring Boot en dev. A adapter le jour d'un deploiement
 // (variable d'environnement Vite, ex: import.meta.env.VITE_API_URL).
-const API_BASE_URL = 'http://localhost:8080/api'
+const API_BASE_URL = `http://${window.location.hostname}:8080/api`
 const api = axios.create({
   baseURL: `http://${window.location.hostname}:8080/api`
 })
