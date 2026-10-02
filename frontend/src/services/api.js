@@ -4,7 +4,7 @@ import axios from 'axios'
 // (variable d'environnement Vite, ex: import.meta.env.VITE_API_URL).
 const API_BASE_URL = 'http://localhost:8080/api'
 const api = axios.create({
-  baseURL: API_BASE_URL
+  baseURL: `http://${window.location.hostname}:8080/api`
 })
 
 export function teamLogoUrl(teamId) {
