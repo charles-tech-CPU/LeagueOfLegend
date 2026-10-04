@@ -295,10 +295,64 @@ class PlayerServiceTest {
 
         assertThatThrownBy(() -> playerService.transfer(5L, sameTeam))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Le joueur fait deja partie de G2");
+                .hasMessage("Le joueur fait deja partie de G2 au poste MID");
         assertThatThrownBy(() -> playerService.transfer(5L, beforeArrival))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageStartingWith("La date du transfert doit etre posterieure a l'arrivee chez G2");
+    }
+
+    @Test
+    void unRoleSwapOuvreUnNouveauPassageDansLaMemeEquipe() {
+        PlayerStint midAtG2 = stint(10L, g2, LocalDate.of(2025, 1, 1), null);
+
+        PlayerDto swapped =
+                playerService.transfer(5L, new PlayerTransferDto(1L, LocalDate.of(2025, 7, 1), Position.ADC));
+
+        assertThat(midAtG2.getEndDate()).isEqualTo(LocalDate.of(2025, 6, 30));
+        assertThat(midAtG2.getPosition()).isEqualTo(Position.MID);
+        ArgumentCaptor<PlayerStint> created = ArgumentCaptor.forClass(PlayerStint.class);
+        verify(stintRepository).save(created.capture());
+        assertThat(created.getValue().getTeam()).isSameAs(g2);
+        assertThat(created.getValue().getPosition()).isEqualTo(Position.ADC);
+        assertThat(created.getValue().getStartDate()).isEqualTo(LocalDate.of(2025, 7, 1));
+        assertThat(swapped.position()).isEqualTo(Position.ADC);
+        assertThat(swapped.teamCode()).isEqualTo("G2");
+    }
+
+    @Test
+    void lEffectifDUneSaisonAfficheLeJoueurAChaquePosteOccupe() {
+        when(stintRepository.findByTeamId(1L))
+                .thenReturn(List.of(
+                        new PlayerStint(caps, g2, Position.MID, LocalDate.of(2015, 1, 1), LocalDate.of(2015, 6, 30)),
+                        new PlayerStint(caps, g2, Position.ADC, LocalDate.of(2015, 7, 1), null)));
+
+        assertThat(playerService.findByTeamAndSeason(1L, 2015))
+                .extracting(PlayerDto::position)
+                .containsExactly(Position.MID, Position.ADC);
+        assertThat(playerService.findByTeamAndSeason(1L, 2016))
+                .extracting(PlayerDto::position)
+                .containsExactly(Position.ADC);
+    }
+
+    @Test
+    void modifierLePosteDuJoueurCorrigeLePassageEnCours() {
+        PlayerStint current = stint(10L, g2, null, null);
+
+        playerService.update(5L, new PlayerCreateDto("Caps", "DK", Position.ADC));
+
+        assertThat(current.getPosition()).isEqualTo(Position.ADC);
+    }
+
+    @Test
+    void corrigerLePosteDuPassageEnCoursMetAJourLeJoueur() {
+        stint(10L, g2, null, null);
+        when(stintRepository.findById(10L)).thenReturn(Optional.of(stints.get(0)));
+
+        PlayerStintDto updated =
+                playerService.updateStint(10L, new PlayerStintCreateDto(1L, Position.SUPP, null, null));
+
+        assertThat(updated.position()).isEqualTo(Position.SUPP);
+        assertThat(caps.getPosition()).isEqualTo(Position.SUPP);
     }
 
     @Test

@@ -26,7 +26,7 @@ class PlayerControllerTest {
 
     private static final PlayerDto CAPS = new PlayerDto(5L, 1L, "G2", "G2 Esports", "Caps", "DK", Position.MID);
     private static final PlayerStintDto STINT = new PlayerStintDto(
-            10L, 1L, "G2", "G2 Esports", false, null, null, true, 0, 0, 0, 0, 0, List.of(), List.of());
+            10L, 1L, "G2", "G2 Esports", false, Position.MID, null, null, true, 0, 0, 0, 0, 0, List.of(), List.of());
 
     @Mock
     private PlayerService playerService;

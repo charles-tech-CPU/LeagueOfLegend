@@ -7,8 +7,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Un passage d'un joueur dans une equipe, sur une periode. Le passage en cours
- * (endDate nul) correspond a l'equipe actuelle du joueur (Player.team).
+ * Un passage d'un joueur dans une equipe, a un poste, sur une periode. Le passage en cours
+ * (endDate nul) correspond a l'equipe et au poste actuels du joueur (Player.team, Player.position).
+ * Un role swap dans la meme equipe se traduit par deux passages consecutifs.
  */
 @Entity
 @Table(name = "player_stint")
@@ -29,6 +30,11 @@ public class PlayerStint {
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
 
+    /** Poste occupe pendant le passage. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private Position position;
+
     /** Date d'arrivee, nulle si inconnue. */
     @Column(name = "start_date")
     private LocalDate startDate;
@@ -37,9 +43,15 @@ public class PlayerStint {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    /** Passage au poste actuel du joueur. */
     public PlayerStint(Player player, Team team, LocalDate startDate, LocalDate endDate) {
+        this(player, team, player.getPosition(), startDate, endDate);
+    }
+
+    public PlayerStint(Player player, Team team, Position position, LocalDate startDate, LocalDate endDate) {
         this.player = player;
         this.team = team;
+        this.position = position;
         this.startDate = startDate;
         this.endDate = endDate;
     }

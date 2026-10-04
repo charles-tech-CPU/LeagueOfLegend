@@ -1,5 +1,6 @@
 package com.charles.lolresults.dto;
 
+import com.charles.lolresults.domain.Position;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -13,6 +14,7 @@ public record PlayerStintDto(
         String teamCode,
         String teamName,
         boolean teamHasLogo,
+        Position position,
         LocalDate startDate,
         LocalDate endDate,
         boolean current,

@@ -69,6 +69,7 @@
               <span class="stint-code">{{ s.teamCode }}</span>
               <span class="stint-name">{{ s.teamName }}</span>
             </router-link>
+            <span class="league-badge" :style="{ '--league-color': positionColor(s.position) }">{{ s.position }}</span>
             <span v-if="s.current" class="current-badge">Équipe actuelle</span>
             <span class="stint-period">{{ period(s) }}</span>
           </header>
@@ -76,6 +77,9 @@
           <form v-if="editingId === s.id" class="stint-edit" @submit.prevent="saveStint(s)">
             <select v-model="stintForm.teamId" aria-label="Équipe" :disabled="s.current">
               <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.code }} · {{ t.name }}</option>
+            </select>
+            <select v-model="stintForm.position" aria-label="Poste">
+              <option v-for="o in POSITIONS" :key="o.key" :value="o.key">{{ o.key }}</option>
             </select>
             <label>Arrivée <input v-model="stintForm.startDate" type="date" aria-label="Date d'arrivée" /></label>
             <label v-if="!s.current">
@@ -158,7 +162,7 @@
           </details>
 
           <div class="stint-actions">
-            <button type="button" class="btn-secondary btn-small" @click="startEdit(s)">Modifier les dates</button>
+            <button type="button" class="btn-secondary btn-small" @click="startEdit(s)">Modifier</button>
             <button
               v-if="pendingDeleteId === s.id"
               type="button"
@@ -182,6 +186,10 @@
         <option :value="null" disabled>Équipe</option>
         <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.code }} · {{ t.name }}</option>
       </select>
+      <select v-model="newStint.position" aria-label="Poste">
+        <option :value="null">Poste actuel</option>
+        <option v-for="o in POSITIONS" :key="o.key" :value="o.key">{{ o.key }}</option>
+      </select>
       <label class="date-field">Arrivée <input v-model="newStint.startDate" type="date" aria-label="Date d'arrivée" /></label>
       <label class="date-field">
         Départ <input v-model="newStint.endDate" type="date" aria-label="Date de départ" required />
@@ -196,7 +204,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import api, { teamLogoUrl } from '../services/api'
-import { positionColor } from '../positions'
+import { POSITIONS, positionColor } from '../positions'
 import { countryName, isKnownCountry } from '../countries'
 import { leagueColor } from '../leagueColors'
 import { fullDay } from '../format'
@@ -212,9 +220,9 @@ const error = ref('')
 const transferring = ref(false)
 
 const editingId = ref(null)
-const stintForm = reactive({ teamId: null, startDate: '', endDate: '' })
+const stintForm = reactive({ teamId: null, position: null, startDate: '', endDate: '' })
 const pendingDeleteId = ref(null)
-const newStint = reactive({ teamId: null, startDate: '', endDate: '' })
+const newStint = reactive({ teamId: null, position: null, startDate: '', endDate: '' })
 
 const career = computed(() => {
   const wins = stints.value.reduce((sum, s) => sum + s.wins, 0)
@@ -282,12 +290,18 @@ function startEdit(stint) {
   pendingDeleteId.value = null
   editingId.value = stint.id
   stintForm.teamId = stint.teamId
+  stintForm.position = stint.position
   stintForm.startDate = stint.startDate ?? ''
   stintForm.endDate = stint.endDate ?? ''
 }
 
 function stintPayload(form) {
-  return { teamId: form.teamId, startDate: form.startDate || null, endDate: form.endDate || null }
+  return {
+    teamId: form.teamId,
+    position: form.position,
+    startDate: form.startDate || null,
+    endDate: form.endDate || null
+  }
 }
 
 async function saveStint(stint) {
@@ -316,7 +330,7 @@ async function addStint() {
   error.value = ''
   try {
     await api.addStint(props.id, stintPayload(newStint))
-    Object.assign(newStint, { teamId: null, startDate: '', endDate: '' })
+    Object.assign(newStint, { teamId: null, position: null, startDate: '', endDate: '' })
     await reload()
   } catch (e) {
     error.value = apiError(e, "Erreur lors de l'ajout du passage.")

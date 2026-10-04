@@ -5,6 +5,7 @@ import com.charles.lolresults.domain.Match;
 import com.charles.lolresults.domain.MatchStatus;
 import com.charles.lolresults.domain.Player;
 import com.charles.lolresults.domain.PlayerStint;
+import com.charles.lolresults.domain.Position;
 import com.charles.lolresults.domain.Team;
 import com.charles.lolresults.dto.FormerPlayerCreateDto;
 import com.charles.lolresults.dto.MatchDto;
@@ -35,7 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Joueurs et historique de leurs equipes (passages). Invariant : Player.team est
- * toujours l'equipe du passage en cours, ou nul s'il n'y en a pas.
+ * toujours l'equipe du passage en cours, ou nul s'il n'y en a pas, et Player.position
+ * le poste de ce passage. Un role swap ouvre un nouveau passage dans la meme equipe.
  *
  * Les resultats d'un passage ne sont pas stockes : ils sont deduits des matchs
  * COMPLETED de l'equipe pendant la periode, en considerant que le joueur les a tous joues.
@@ -51,6 +53,9 @@ public class PlayerService {
     /** Tri de l'effectif : par poste (TOP -> SUPP) puis par pseudo. */
     private static final Comparator<Player> BY_POSITION_THEN_PSEUDO =
             Comparator.comparing(Player::getPosition).thenComparing(Player::getPseudo, String.CASE_INSENSITIVE_ORDER);
+
+    private static final Comparator<PlayerDto> DTO_BY_POSITION_THEN_PSEUDO =
+            Comparator.comparing(PlayerDto::position).thenComparing(PlayerDto::pseudo, String.CASE_INSENSITIVE_ORDER);
 
     /** Passage en cours d'abord, puis du plus recent au plus ancien. */
     private static final Comparator<PlayerStint> MOST_RECENT_FIRST = Comparator.comparing(
@@ -101,16 +106,16 @@ public class PlayerService {
      * Effectif d'une saison : joueurs ayant un passage dans l'equipe pendant l'annee. Une
      * arrivee inconnue ne couvre que l'annee de depart (ou l'annee en cours pour un passage
      * en cours), pour ne pas faire remonter l'effectif actuel dans les anciennes saisons.
+     * Chaque joueur apparait au poste occupe pendant la saison, deux fois en cas de role swap.
      */
     @Transactional(readOnly = true)
     public List<PlayerDto> findByTeamAndSeason(Long teamId, int season) {
         findTeam(teamId);
         return stintRepository.findByTeamId(teamId).stream()
                 .filter(stint -> seasons(stint).anyMatch(year -> year == season))
-                .map(PlayerStint::getPlayer)
+                .map(stint -> PlayerDto.from(stint.getPlayer(), stint.getPosition()))
                 .distinct()
-                .sorted(BY_POSITION_THEN_PSEUDO)
-                .map(PlayerDto::from)
+                .sorted(DTO_BY_POSITION_THEN_PSEUDO)
                 .toList();
     }
 
@@ -161,12 +166,19 @@ public class PlayerService {
         return PlayerDto.from(player);
     }
 
-    /** Modifie l'identite du joueur ; l'equipe se change par un transfert. */
+    /**
+     * Modifie l'identite du joueur ; l'equipe se change par un transfert. Le poste corrige
+     * aussi celui du passage en cours (un role swap date se fait par un transfert).
+     */
     public PlayerDto update(Long id, PlayerCreateDto dto) {
         Player player = findPlayer(id);
         player.setPseudo(dto.pseudo().trim());
         player.setNationality(countryCode(dto.nationality()));
         player.setPosition(dto.position());
+        stintRepository.findByPlayerIdAndEndDateIsNull(id).ifPresent(current -> {
+            current.setPosition(dto.position());
+            stintRepository.save(current);
+        });
         return PlayerDto.from(playerRepository.save(player));
     }
 
@@ -177,17 +189,23 @@ public class PlayerService {
     /**
      * Le joueur rejoint une autre equipe (ou aucune si teamId est nul) a partir de la
      * date donnee : le passage en cours se termine la veille et un nouveau commence.
+     * Rester dans la meme equipe avec un autre poste est un role swap.
      */
     public PlayerDto transfer(Long id, PlayerTransferDto dto) {
         Player player = findPlayer(id);
         Team target = dto.teamId() != null ? findTeam(dto.teamId()) : null;
+        Position position = dto.position() != null ? dto.position() : player.getPosition();
         PlayerStint current = stintRepository.findByPlayerIdAndEndDateIsNull(id).orElse(null);
 
         if (current == null && target == null) {
             throw new IllegalArgumentException("Le joueur est deja sans equipe");
         }
-        if (current != null && target != null && current.getTeam().getId().equals(target.getId())) {
-            throw new IllegalArgumentException("Le joueur fait deja partie de " + target.getCode());
+        if (current != null
+                && target != null
+                && current.getTeam().getId().equals(target.getId())
+                && current.getPosition() == position) {
+            throw new IllegalArgumentException(
+                    "Le joueur fait deja partie de " + target.getCode() + " au poste " + position);
         }
 
         if (current != null) {
@@ -203,10 +221,11 @@ public class PlayerService {
         }
         if (target != null) {
             checkNoOverlap(id, dto.date(), null, null);
-            stintRepository.save(new PlayerStint(player, target, dto.date(), null));
+            stintRepository.save(new PlayerStint(player, target, position, dto.date(), null));
         }
 
         player.setTeam(target);
+        player.setPosition(position);
         return PlayerDto.from(playerRepository.save(player));
     }
 
@@ -233,11 +252,13 @@ public class PlayerService {
         }
         checkDates(dto.startDate(), dto.endDate());
         checkNoOverlap(playerId, dto.startDate(), dto.endDate(), null);
-        PlayerStint stint = stintRepository.save(new PlayerStint(player, team, dto.startDate(), dto.endDate()));
+        Position position = dto.position() != null ? dto.position() : player.getPosition();
+        PlayerStint stint =
+                stintRepository.save(new PlayerStint(player, team, position, dto.startDate(), dto.endDate()));
         return toStintDto(stint, completedMatches(team.getId()));
     }
 
-    /** Corrige les dates (et l'equipe, pour un passage termine) d'un passage. */
+    /** Corrige les dates, le poste (et l'equipe, pour un passage termine) d'un passage. */
     public PlayerStintDto updateStint(Long stintId, PlayerStintCreateDto dto) {
         PlayerStint stint = findStint(stintId);
         Team team = findTeam(dto.teamId());
@@ -257,6 +278,14 @@ public class PlayerService {
         stint.setTeam(team);
         stint.setStartDate(dto.startDate());
         stint.setEndDate(dto.endDate());
+        if (dto.position() != null) {
+            stint.setPosition(dto.position());
+            if (stint.isCurrent()) {
+                Player player = stint.getPlayer();
+                player.setPosition(dto.position());
+                playerRepository.save(player);
+            }
+        }
         PlayerStint saved = stintRepository.save(stint);
         return toStintDto(saved, completedMatches(team.getId()));
     }
@@ -315,6 +344,7 @@ public class PlayerService {
                 team.getCode(),
                 team.getName(),
                 team.getLogo() != null,
+                stint.getPosition(),
                 stint.getStartDate(),
                 stint.getEndDate(),
                 stint.isCurrent(),
