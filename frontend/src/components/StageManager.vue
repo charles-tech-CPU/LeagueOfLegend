@@ -138,7 +138,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, useId, watch } from 'vue'
 import api from '../services/api'
 import { localIsoDate } from '../format'
 import { BEST_OFS, SPLITS, STAGE_FORMATS, formatLabel } from '../formats'
@@ -150,7 +150,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['changed'])
 
-const uid = Math.random().toString(36).slice(2, 8)
+const uid = useId()
 const error = ref('')
 const pendingDeleteId = ref(null)
 const swissDates = reactive({})

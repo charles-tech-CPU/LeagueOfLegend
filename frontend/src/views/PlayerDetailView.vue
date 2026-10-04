@@ -127,6 +127,15 @@
             <summary>Voir les {{ s.matches.length }} matchs</summary>
             <div class="matches-scroll">
             <table>
+              <thead class="sr-only">
+                <tr>
+                  <th scope="col">Date</th>
+                  <th scope="col">Compétition</th>
+                  <th scope="col">Phase</th>
+                  <th scope="col">Adversaire</th>
+                  <th scope="col">Résultat</th>
+                </tr>
+              </thead>
               <tbody>
                 <tr v-for="m in s.matches" :key="m.id">
                   <td class="muted">{{ fullDay(m.date) }}</td>
@@ -659,6 +668,18 @@ watch(() => props.id, load)
 .matches summary:hover {
   color: var(--accent);
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .matches-scroll {
   overflow-x: auto;
 }
