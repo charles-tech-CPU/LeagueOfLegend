@@ -9,5 +9,7 @@ public interface PlayerStintRepository extends JpaRepository<PlayerStint, Long> 
 
     List<PlayerStint> findByPlayerId(Long playerId);
 
+    List<PlayerStint> findByTeamId(Long teamId);
+
     Optional<PlayerStint> findByPlayerIdAndEndDateIsNull(Long playerId);
 }

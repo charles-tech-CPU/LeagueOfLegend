@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.charles.lolresults.domain.Position;
+import com.charles.lolresults.dto.FormerPlayerCreateDto;
 import com.charles.lolresults.dto.PlayerCreateDto;
 import com.charles.lolresults.dto.PlayerDto;
 import com.charles.lolresults.dto.PlayerStintCreateDto;
@@ -39,10 +40,14 @@ class PlayerControllerTest {
         when(playerService.findOne(5L)).thenReturn(CAPS);
         when(playerService.findByTeam(1L)).thenReturn(List.of(CAPS));
         when(playerService.findStints(5L)).thenReturn(List.of(STINT));
+        when(playerService.findByTeamAndSeason(1L, 2011)).thenReturn(List.of(CAPS));
+        when(playerService.findRosterSeasons(1L)).thenReturn(List.of(2026, 2011));
 
         assertThat(playerController.findAll()).containsExactly(CAPS);
         assertThat(playerController.findOne(5L)).isEqualTo(CAPS);
-        assertThat(playerController.findByTeam(1L)).containsExactly(CAPS);
+        assertThat(playerController.findByTeam(1L, null)).containsExactly(CAPS);
+        assertThat(playerController.findByTeam(1L, 2011)).containsExactly(CAPS);
+        assertThat(playerController.findRosterSeasons(1L)).containsExactly(2026, 2011);
         assertThat(playerController.findStints(5L)).containsExactly(STINT);
     }
 
@@ -50,11 +55,17 @@ class PlayerControllerTest {
     void lesEcrituresSurLeJoueurDeleguentAuService() {
         PlayerCreateDto dto = new PlayerCreateDto("Caps", "DK", Position.MID);
         PlayerTransferDto transfer = new PlayerTransferDto(2L, LocalDate.of(2026, 1, 1));
+        FormerPlayerCreateDto former =
+                new FormerPlayerCreateDto("Caps", "DK", Position.MID, null, LocalDate.of(2018, 11, 30));
         when(playerService.create(1L, dto)).thenReturn(CAPS);
+        when(playerService.createWithoutTeam(dto)).thenReturn(CAPS);
+        when(playerService.createFormer(1L, former)).thenReturn(CAPS);
         when(playerService.update(5L, dto)).thenReturn(CAPS);
         when(playerService.transfer(5L, transfer)).thenReturn(CAPS);
 
         assertThat(playerController.create(1L, dto)).isEqualTo(CAPS);
+        assertThat(playerController.createWithoutTeam(dto)).isEqualTo(CAPS);
+        assertThat(playerController.createFormer(1L, former)).isEqualTo(CAPS);
         assertThat(playerController.update(5L, dto)).isEqualTo(CAPS);
         assertThat(playerController.transfer(5L, transfer)).isEqualTo(CAPS);
         playerController.delete(5L);

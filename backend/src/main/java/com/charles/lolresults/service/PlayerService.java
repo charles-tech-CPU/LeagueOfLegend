@@ -6,6 +6,7 @@ import com.charles.lolresults.domain.MatchStatus;
 import com.charles.lolresults.domain.Player;
 import com.charles.lolresults.domain.PlayerStint;
 import com.charles.lolresults.domain.Team;
+import com.charles.lolresults.dto.FormerPlayerCreateDto;
 import com.charles.lolresults.dto.MatchDto;
 import com.charles.lolresults.dto.PlayerCreateDto;
 import com.charles.lolresults.dto.PlayerDto;
@@ -27,6 +28,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeSet;
+import java.util.stream.IntStream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -92,6 +95,61 @@ public class PlayerService {
                 .sorted(BY_POSITION_THEN_PSEUDO)
                 .map(PlayerDto::from)
                 .toList();
+    }
+
+    /**
+     * Effectif d'une saison : joueurs ayant un passage dans l'equipe pendant l'annee. Une
+     * arrivee inconnue ne couvre que l'annee de depart (ou l'annee en cours pour un passage
+     * en cours), pour ne pas faire remonter l'effectif actuel dans les anciennes saisons.
+     */
+    @Transactional(readOnly = true)
+    public List<PlayerDto> findByTeamAndSeason(Long teamId, int season) {
+        findTeam(teamId);
+        return stintRepository.findByTeamId(teamId).stream()
+                .filter(stint -> seasons(stint).anyMatch(year -> year == season))
+                .map(PlayerStint::getPlayer)
+                .distinct()
+                .sorted(BY_POSITION_THEN_PSEUDO)
+                .map(PlayerDto::from)
+                .toList();
+    }
+
+    /** Saisons ou l'equipe a joue un match ou compte un joueur, de la plus recente a la plus ancienne. */
+    @Transactional(readOnly = true)
+    public List<Integer> findRosterSeasons(Long teamId) {
+        findTeam(teamId);
+        TreeSet<Integer> seasons = new TreeSet<>(Comparator.reverseOrder());
+        matchRepository.findByTeam1_IdOrTeam2_IdOrderByDateDesc(teamId, teamId).stream()
+                .map(Match::getDate)
+                .filter(Objects::nonNull)
+                .forEach(date -> seasons.add(date.getYear()));
+        stintRepository.findByTeamId(teamId).forEach(stint -> seasons(stint).forEach(seasons::add));
+        return List.copyOf(seasons);
+    }
+
+    private static IntStream seasons(PlayerStint stint) {
+        int last = stint.getEndDate() != null
+                ? stint.getEndDate().getYear()
+                : LocalDate.now().getYear();
+        int first = stint.getStartDate() != null ? stint.getStartDate().getYear() : last;
+        return IntStream.rangeClosed(first, last);
+    }
+
+    /** Cree un joueur sans equipe actuelle (retraite, ou ajoute pour son historique). */
+    public PlayerDto createWithoutTeam(PlayerCreateDto dto) {
+        Player player = playerRepository.save(
+                new Player(null, dto.pseudo().trim(), countryCode(dto.nationality()), dto.position()));
+        return PlayerDto.from(player);
+    }
+
+    /** Cree un ancien joueur de l'equipe : sans equipe actuelle, avec un passage termine dans celle-ci. */
+    public PlayerDto createFormer(Long teamId, FormerPlayerCreateDto dto) {
+        Team team = findTeam(teamId);
+        checkDates(dto.startDate(), dto.endDate());
+        Player player = playerRepository.save(
+                new Player(null, dto.pseudo().trim(), countryCode(dto.nationality()), dto.position()));
+        stintRepository.save(new PlayerStint(player, team, dto.startDate(), dto.endDate()));
+        return PlayerDto.from(player);
     }
 
     /** Cree le joueur dans l'equipe, avec un passage en cours (date d'arrivee inconnue). */

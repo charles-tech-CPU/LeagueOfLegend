@@ -36,11 +36,18 @@ export default {
   updateTeam: (id, payload) => api.put(`/teams/${id}`, payload).then(r => r.data),
   deleteTeam: (id) => api.delete(`/teams/${id}`),
 
-  // Joueurs (effectif actuel d'une equipe, ou sans equipe)
+  // Joueurs (effectif actuel d'une equipe ou d'une saison passee, ou sans equipe)
   getAllPlayers: () => api.get('/players').then(r => r.data),
   getPlayer: (id) => api.get(`/players/${id}`).then(r => r.data),
-  getPlayers: (teamId) => api.get(`/teams/${teamId}/players`).then(r => r.data),
+  // season nul = effectif actuel
+  getPlayers: (teamId, season = null) =>
+    api.get(`/teams/${teamId}/players`, { params: season ? { season } : {} }).then(r => r.data),
+  getRosterSeasons: (teamId) => api.get(`/teams/${teamId}/roster-seasons`).then(r => r.data),
   createPlayer: (teamId, payload) => api.post(`/teams/${teamId}/players`, payload).then(r => r.data),
+  // Joueur sans equipe actuelle (retraite...)
+  createFreePlayer: (payload) => api.post('/players', payload).then(r => r.data),
+  // payload : { pseudo, nationality, position, startDate (facultatif), endDate }
+  createFormerPlayer: (teamId, payload) => api.post(`/teams/${teamId}/former-players`, payload).then(r => r.data),
   updatePlayer: (id, payload) => api.put(`/players/${id}`, payload).then(r => r.data),
   deletePlayer: (id) => api.delete(`/players/${id}`),
   // payload : { teamId (nul = quitte son equipe), date }

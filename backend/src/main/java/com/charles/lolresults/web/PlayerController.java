@@ -1,5 +1,6 @@
 package com.charles.lolresults.web;
 
+import com.charles.lolresults.dto.FormerPlayerCreateDto;
 import com.charles.lolresults.dto.PlayerCreateDto;
 import com.charles.lolresults.dto.PlayerDto;
 import com.charles.lolresults.dto.PlayerStintCreateDto;
@@ -36,16 +37,39 @@ public class PlayerController {
         return playerService.findOne(id);
     }
 
-    /** Effectif actuel, trie par poste (TOP -> SUPP) puis par pseudo. */
+    /** Joueur sans equipe actuelle (retraite...). */
+    @PostMapping("/players")
+    @ResponseStatus(HttpStatus.CREATED)
+    public PlayerDto createWithoutTeam(@Valid @RequestBody PlayerCreateDto dto) {
+        return playerService.createWithoutTeam(dto);
+    }
+
+    /**
+     * Effectif actuel, ou celui d'une saison (joueurs passes par l'equipe pendant l'annee),
+     * trie par poste (TOP -> SUPP) puis par pseudo.
+     */
     @GetMapping("/teams/{teamId}/players")
-    public List<PlayerDto> findByTeam(@PathVariable Long teamId) {
-        return playerService.findByTeam(teamId);
+    public List<PlayerDto> findByTeam(@PathVariable Long teamId, @RequestParam(required = false) Integer season) {
+        return season == null ? playerService.findByTeam(teamId) : playerService.findByTeamAndSeason(teamId, season);
+    }
+
+    /** Saisons proposees pour consulter l'effectif, de la plus recente a la plus ancienne. */
+    @GetMapping("/teams/{teamId}/roster-seasons")
+    public List<Integer> findRosterSeasons(@PathVariable Long teamId) {
+        return playerService.findRosterSeasons(teamId);
     }
 
     @PostMapping("/teams/{teamId}/players")
     @ResponseStatus(HttpStatus.CREATED)
     public PlayerDto create(@PathVariable Long teamId, @Valid @RequestBody PlayerCreateDto dto) {
         return playerService.create(teamId, dto);
+    }
+
+    /** Ancien joueur de l'equipe, avec un passage termine. */
+    @PostMapping("/teams/{teamId}/former-players")
+    @ResponseStatus(HttpStatus.CREATED)
+    public PlayerDto createFormer(@PathVariable Long teamId, @Valid @RequestBody FormerPlayerCreateDto dto) {
+        return playerService.createFormer(teamId, dto);
     }
 
     @PutMapping("/players/{id}")

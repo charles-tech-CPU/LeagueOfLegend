@@ -88,11 +88,25 @@
   <p v-else-if="loaded && players.length" class="muted">Aucun joueur ne correspond à la recherche.</p>
   <p v-else-if="loaded">Aucun joueur pour l'instant. Ajoute-les depuis l'onglet Effectif de la fiche d'une équipe.</p>
 
+  <h2>Ajouter un joueur sans équipe</h2>
+  <p class="muted">
+    Pour un joueur retraité ou libre : ajoute ensuite ses anciennes équipes depuis sa fiche (passages précédents).
+  </p>
+  <form class="inline" @submit.prevent="createFree">
+    <input v-model="newPlayer.pseudo" placeholder="Pseudo (ex: xPeke)" aria-label="Pseudo" required maxlength="50" />
+    <CountrySelect v-model="newPlayer.nationality" />
+    <select v-model="newPlayer.position" aria-label="Poste">
+      <option v-for="o in POSITIONS" :key="o.key" :value="o.key">{{ o.key }}</option>
+    </select>
+    <button type="submit" :disabled="!newPlayer.pseudo.trim()">Ajouter</button>
+  </form>
+
   <p v-if="error" class="error">{{ error }}</p>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import api, { teamLogoUrl } from '../services/api'
 import { useSort } from '../composables/useSort'
 import { POSITIONS, positionColor, positionIndex } from '../positions'
@@ -113,6 +127,8 @@ const editingId = ref(null)
 const editForm = reactive({ pseudo: '', nationality: '', position: 'TOP' })
 const pendingDeleteId = ref(null)
 const transferId = ref(null)
+const newPlayer = reactive({ pseudo: '', nationality: '', position: 'TOP' })
+const router = useRouter()
 
 const teamsById = computed(() => Object.fromEntries(teams.value.map(t => [t.id, t])))
 const freeAgentCount = computed(() => players.value.filter(p => !p.teamId).length)
@@ -202,6 +218,17 @@ async function removePlayer(player) {
     players.value = await api.getAllPlayers()
   } catch (e) {
     error.value = apiError(e, 'Erreur lors de la suppression du joueur.')
+  }
+}
+
+// Cree le joueur puis ouvre sa fiche, pour y ajouter son historique.
+async function createFree() {
+  error.value = ''
+  try {
+    const created = await api.createFreePlayer({ ...newPlayer })
+    router.push(`/players/${created.id}`)
+  } catch (e) {
+    error.value = apiError(e, "Erreur lors de l'ajout du joueur.")
   }
 }
 

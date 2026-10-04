@@ -53,6 +53,14 @@
   </section>
 
   <section v-if="activeTab === 'roster'" class="tab-panel">
+    <label v-if="seasons.length" class="season-select">
+      Effectif
+      <select v-model="season" aria-label="Saison de l'effectif">
+        <option :value="null">Actuel</option>
+        <option v-for="y in seasons" :key="y" :value="y">{{ y }}</option>
+      </select>
+    </label>
+
     <div class="roster">
       <article
         v-for="pos in POSITIONS"
@@ -84,6 +92,7 @@
               <CountryFlag v-if="p.nationality" :code="p.nationality" class="nationality" />
               <div class="player-actions">
                 <button type="button" class="btn-secondary btn-small" @click="startEdit(p)">Modifier</button>
+                <template v-if="season === null">
                 <button
                   v-if="pendingDeleteId === p.id"
                   type="button"
@@ -95,6 +104,7 @@
                 <button v-else type="button" class="btn-secondary btn-small" @click="pendingDeleteId = p.id">
                   Supprimer
                 </button>
+                </template>
               </div>
             </template>
           </li>
@@ -105,7 +115,11 @@
       </article>
     </div>
 
-    <h2>Ajouter un joueur</h2>
+    <h2>{{ former ? 'Ajouter un ancien joueur' : 'Ajouter un joueur' }}</h2>
+    <label class="toggle">
+      <input v-model="former" type="checkbox" />
+      Ancien joueur (passage terminé, avec ses dates)
+    </label>
     <form class="inline" @submit.prevent="submit">
       <input
         ref="pseudoInput"
@@ -114,20 +128,35 @@
         aria-label="Pseudo"
         required
         maxlength="50"
+        :list="former ? formerListId : undefined"
       />
-      <CountrySelect v-model="form.nationality" />
-      <select v-model="form.position" aria-label="Poste">
-        <option v-for="o in POSITIONS" :key="o.key" :value="o.key">{{ o.key }}</option>
-      </select>
-      <button type="submit">Ajouter</button>
+      <datalist v-if="former" :id="formerListId">
+        <option v-for="p in allPlayers" :key="p.id" :value="p.pseudo" />
+      </datalist>
+      <template v-if="!existingPlayer">
+        <CountrySelect v-model="form.nationality" />
+        <select v-model="form.position" aria-label="Poste">
+          <option v-for="o in POSITIONS" :key="o.key" :value="o.key">{{ o.key }}</option>
+        </select>
+      </template>
+      <template v-if="former">
+        <label class="date-field">Arrivée <input v-model="form.startDate" type="date" aria-label="Date d'arrivée" /></label>
+        <label class="date-field">
+          Départ <input v-model="form.endDate" type="date" aria-label="Date de départ" required />
+        </label>
+      </template>
+      <button type="submit" :disabled="former && !form.endDate">Ajouter</button>
     </form>
+    <p v-if="existingPlayer" class="muted hint">
+      {{ existingPlayer.pseudo }} existe déjà : un passage chez {{ team?.code }} sera ajouté à son historique.
+    </p>
   </section>
 
   <p v-if="error" class="error">{{ error }}</p>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, useId, watch } from 'vue'
 import api, { teamLogoUrl } from '../services/api'
 import { POSITIONS } from '../positions'
 import { fullDay } from '../format'
@@ -150,8 +179,22 @@ const players = ref([])
 const loaded = ref(false)
 const error = ref('')
 
-const form = reactive({ pseudo: '', nationality: '', position: 'TOP' })
+// Saison affichee dans l'effectif (null = effectif actuel)
+const seasons = ref([])
+const season = ref(null)
+
+const form = reactive({ pseudo: '', nationality: '', position: 'TOP', startDate: '', endDate: '' })
 const pseudoInput = ref(null)
+
+// Ancien joueur : passage termine dans l'equipe ; s'il existe deja, le passage s'ajoute a son historique.
+const former = ref(false)
+const formerListId = useId()
+const allPlayers = ref([])
+const existingPlayer = computed(() => {
+  if (!former.value) return null
+  const pseudo = form.pseudo.trim().toLowerCase()
+  return pseudo ? (allPlayers.value.find(p => p.pseudo.toLowerCase() === pseudo) ?? null) : null
+})
 
 const editingId = ref(null)
 const editForm = reactive({ pseudo: '', nationality: '', position: 'TOP' })
@@ -179,16 +222,48 @@ function apiError(e, fallback) {
 
 async function load() {
   error.value = ''
+  season.value = null
   try {
-    const [t, p, n] = await Promise.all([api.getTeam(props.id), api.getPlayers(props.id), api.getTeamNames(props.id)])
+    const [t, p, n, s] = await Promise.all([
+      api.getTeam(props.id),
+      api.getPlayers(props.id),
+      api.getTeamNames(props.id),
+      api.getRosterSeasons(props.id)
+    ])
     names.value = n
     team.value = t
     players.value = p
+    seasons.value = s
   } catch (e) {
     error.value = apiError(e, "Impossible de charger l'équipe.")
   }
   loaded.value = true
 }
+
+async function loadPlayers() {
+  players.value = await api.getPlayers(props.id, season.value)
+}
+
+// Une saison passee : on ajoute par defaut un ancien joueur, sur toute l'annee.
+watch(season, async y => {
+  error.value = ''
+  former.value = y !== null
+  if (y !== null) {
+    form.startDate = `${y}-01-01`
+    form.endDate = `${y}-12-31`
+  }
+  try {
+    await loadPlayers()
+  } catch (e) {
+    error.value = apiError(e, "Impossible de charger l'effectif.")
+  }
+})
+
+watch(former, async on => {
+  if (on && !allPlayers.value.length) {
+    allPlayers.value = await api.getAllPlayers()
+  }
+})
 
 function prefill(position) {
   form.position = position
@@ -197,11 +272,22 @@ function prefill(position) {
 
 async function submit() {
   error.value = ''
+  const identity = { pseudo: form.pseudo, nationality: form.nationality, position: form.position }
+  const period = { startDate: form.startDate || null, endDate: form.endDate || null }
   try {
-    await api.createPlayer(props.id, { ...form })
+    if (!former.value) {
+      await api.createPlayer(props.id, identity)
+    } else if (existingPlayer.value) {
+      await api.addStint(existingPlayer.value.id, { teamId: team.value.id, ...period })
+    } else {
+      await api.createFormerPlayer(props.id, { ...identity, ...period })
+    }
     form.pseudo = ''
     form.nationality = ''
-    players.value = await api.getPlayers(props.id)
+    const [s, all] = await Promise.all([api.getRosterSeasons(props.id), former.value ? api.getAllPlayers() : null])
+    seasons.value = s
+    if (all) allPlayers.value = all
+    await loadPlayers()
   } catch (e) {
     error.value = apiError(e, "Erreur lors de l'ajout du joueur.")
   }
@@ -224,7 +310,7 @@ async function saveEdit(player) {
   try {
     await api.updatePlayer(player.id, { ...editForm })
     editingId.value = null
-    players.value = await api.getPlayers(props.id)
+    await loadPlayers()
   } catch (e) {
     error.value = apiError(e, 'Erreur lors de la modification du joueur.')
   }
@@ -235,7 +321,7 @@ async function removePlayer(player) {
   try {
     await api.deletePlayer(player.id)
     pendingDeleteId.value = null
-    players.value = await api.getPlayers(props.id)
+    await loadPlayers()
   } catch (e) {
     error.value = apiError(e, 'Erreur lors de la suppression du joueur.')
   }
@@ -439,6 +525,32 @@ watch(() => props.id, load)
 }
 
 /* ---------- Effectif : une carte par poste ---------- */
+.season-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+.date-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88em;
+  color: var(--text-muted);
+}
+.hint {
+  margin: -14px 0 24px;
+  font-size: 0.88em;
+}
 .roster {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

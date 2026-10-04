@@ -17,6 +17,7 @@ import com.charles.lolresults.domain.Player;
 import com.charles.lolresults.domain.PlayerStint;
 import com.charles.lolresults.domain.Position;
 import com.charles.lolresults.domain.Team;
+import com.charles.lolresults.dto.FormerPlayerCreateDto;
 import com.charles.lolresults.dto.PlayerCreateDto;
 import com.charles.lolresults.dto.PlayerDto;
 import com.charles.lolresults.dto.PlayerStintCreateDto;
@@ -130,6 +131,87 @@ class PlayerServiceTest {
         assertThat(stint.getValue().getTeam()).isSameAs(g2);
         assertThat(stint.getValue().isCurrent()).isTrue();
         assertThat(stint.getValue().getStartDate()).isNull();
+    }
+
+    @Test
+    void createWithoutTeamCreeUnJoueurSansPassage() {
+        PlayerDto created = playerService.createWithoutTeam(new PlayerCreateDto(" xPeke ", "es", Position.MID));
+
+        assertThat(created.pseudo()).isEqualTo("xPeke");
+        assertThat(created.nationality()).isEqualTo("ES");
+        assertThat(created.teamId()).isNull();
+        verify(stintRepository, never()).save(any());
+    }
+
+    @Test
+    void createFormerCreeUnJoueurSansEquipeAvecUnPassageTermine() {
+        LocalDate start = LocalDate.of(2011, 3, 1);
+        LocalDate end = LocalDate.of(2016, 11, 30);
+
+        PlayerDto created =
+                playerService.createFormer(2L, new FormerPlayerCreateDto("xPeke", "ES", Position.MID, start, end));
+
+        assertThat(created.teamId()).isNull();
+        ArgumentCaptor<PlayerStint> stint = ArgumentCaptor.forClass(PlayerStint.class);
+        verify(stintRepository).save(stint.capture());
+        assertThat(stint.getValue().getTeam()).isSameAs(fnc);
+        assertThat(stint.getValue().getStartDate()).isEqualTo(start);
+        assertThat(stint.getValue().getEndDate()).isEqualTo(end);
+    }
+
+    @Test
+    void createFormerRefuseDesDatesIncoherentesOuUneEquipeInconnue() {
+        FormerPlayerCreateDto inverted = new FormerPlayerCreateDto(
+                "xPeke", null, Position.MID, LocalDate.of(2016, 1, 1), LocalDate.of(2011, 1, 1));
+        FormerPlayerCreateDto valid =
+                new FormerPlayerCreateDto("xPeke", null, Position.MID, null, LocalDate.of(2011, 1, 1));
+
+        assertThatThrownBy(() -> playerService.createFormer(2L, inverted)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> playerService.createFormer(99L, valid)).isInstanceOf(EntityNotFoundException.class);
+        verify(playerRepository, never()).save(any());
+    }
+
+    @Test
+    void lEffectifDUneSaisonRegroupeLesJoueursPassesParLEquipePendantLAnnee() {
+        Player xpeke = new Player(null, "xPeke", "ES", Position.MID);
+        Player cyanide = new Player(null, "Cyanide", "FI", Position.JGL);
+        Player rekkles = new Player(fnc, "Rekkles", "SE", Position.ADC);
+        Player hylissang = new Player(fnc, "Hylissang", "BG", Position.SUPP);
+        when(stintRepository.findByTeamId(2L))
+                .thenReturn(List.of(
+                        new PlayerStint(xpeke, fnc, LocalDate.of(2011, 3, 1), LocalDate.of(2016, 11, 30)),
+                        new PlayerStint(cyanide, fnc, null, LocalDate.of(2013, 5, 1)),
+                        // Deux passages du meme joueur dans la saison : une seule ligne.
+                        new PlayerStint(rekkles, fnc, LocalDate.of(2014, 1, 1), LocalDate.of(2014, 6, 30)),
+                        new PlayerStint(rekkles, fnc, LocalDate.of(2014, 9, 1), null),
+                        // Arrivee inconnue d'un joueur actuel : seulement l'annee en cours.
+                        new PlayerStint(hylissang, fnc, null, null)));
+
+        assertThat(playerService.findByTeamAndSeason(2L, 2011))
+                .extracting(PlayerDto::pseudo)
+                .containsExactly("xPeke");
+        assertThat(playerService.findByTeamAndSeason(2L, 2013))
+                .extracting(PlayerDto::pseudo)
+                .containsExactly("Cyanide", "xPeke");
+        assertThat(playerService.findByTeamAndSeason(2L, 2014))
+                .extracting(PlayerDto::pseudo)
+                .containsExactly("xPeke", "Rekkles");
+        assertThat(playerService.findByTeamAndSeason(2L, LocalDate.now().getYear()))
+                .extracting(PlayerDto::pseudo)
+                .containsExactly("Rekkles", "Hylissang");
+        assertThatThrownBy(() -> playerService.findByTeamAndSeason(99L, 2011))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void lesSaisonsDEffectifCombinentMatchsEtPassagesDuPlusRecentAuPlusAncien() {
+        Competition lec = competition(1L, "LEC", 2019);
+        when(matchRepository.findByTeam1_IdOrTeam2_IdOrderByDateDesc(2L, 2L))
+                .thenReturn(List.of(match(lec, LocalDate.of(2019, 6, 1), fnc, g2, 2, 1, null)));
+        when(stintRepository.findByTeamId(2L))
+                .thenReturn(List.of(new PlayerStint(caps, fnc, LocalDate.of(2011, 6, 1), LocalDate.of(2013, 1, 1))));
+
+        assertThat(playerService.findRosterSeasons(2L)).containsExactly(2019, 2013, 2012, 2011);
     }
 
     @Test
