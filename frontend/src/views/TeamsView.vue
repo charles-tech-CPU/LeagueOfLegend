@@ -32,8 +32,8 @@
           </td>
         </template>
         <template v-else>
-          <td class="code">{{ t.code }}</td>
-          <td class="name">{{ t.name }}</td>
+          <td class="code"><router-link :to="`/teams/${t.id}`">{{ t.code }}</router-link></td>
+          <td class="name"><router-link :to="`/teams/${t.id}`">{{ t.name }}</router-link></td>
           <td>{{ t.region }}</td>
           <td class="actions">
             <button type="button" class="btn-secondary" @click="startEdit(t)">Modifier</button>
@@ -118,8 +118,15 @@ onMounted(load)
 .code {
   font-weight: 800;
 }
-.name {
+.code a {
+  color: var(--text);
+}
+.name a {
   color: var(--text-muted);
+}
+.code a:hover,
+.name a:hover {
+  color: var(--accent);
 }
 .actions {
   display: flex;

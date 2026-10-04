@@ -26,3 +26,9 @@ export function longDay(iso, todayIso = localIsoDate(new Date())) {
   const label = parseIso(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
+
+/** "1 déc. 2025" */
+export function fullDay(iso) {
+  if (!iso) return ''
+  return parseIso(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+}

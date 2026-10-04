@@ -6,7 +6,8 @@
     </router-link>
     <router-link to="/" class="nav-link" :class="{ 'router-link-active': $route.path.startsWith('/competitions') }">🏆 Compétitions</router-link>
     <router-link to="/upcoming" class="nav-link">📅 À venir</router-link>
-    <router-link to="/teams" class="nav-link">🛡️ Équipes</router-link>
+    <router-link to="/teams" class="nav-link" :class="{ 'router-link-active': $route.path.startsWith('/teams') }">🛡️ Équipes</router-link>
+    <router-link to="/players" class="nav-link" :class="{ 'router-link-active': $route.path.startsWith('/players') }">🎮 Joueurs</router-link>
   </nav>
   <router-view />
 </template>

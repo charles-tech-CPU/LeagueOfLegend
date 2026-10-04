@@ -18,9 +18,26 @@ export default {
 
   // Equipes
   getTeams: () => api.get('/teams').then(r => r.data),
+  getTeam: (id) => api.get(`/teams/${id}`).then(r => r.data),
   createTeam: (payload) => api.post('/teams', payload).then(r => r.data),
   updateTeam: (id, payload) => api.put(`/teams/${id}`, payload).then(r => r.data),
   deleteTeam: (id) => api.delete(`/teams/${id}`),
+
+  // Joueurs (effectif actuel d'une equipe, ou sans equipe)
+  getAllPlayers: () => api.get('/players').then(r => r.data),
+  getPlayer: (id) => api.get(`/players/${id}`).then(r => r.data),
+  getPlayers: (teamId) => api.get(`/teams/${teamId}/players`).then(r => r.data),
+  createPlayer: (teamId, payload) => api.post(`/teams/${teamId}/players`, payload).then(r => r.data),
+  updatePlayer: (id, payload) => api.put(`/players/${id}`, payload).then(r => r.data),
+  deletePlayer: (id) => api.delete(`/players/${id}`),
+  // payload : { teamId (nul = quitte son equipe), date }
+  transferPlayer: (id, payload) => api.post(`/players/${id}/transfer`, payload).then(r => r.data),
+
+  // Historique des equipes d'un joueur (passages), avec les resultats de chaque passage
+  getPlayerStints: (playerId) => api.get(`/players/${playerId}/stints`).then(r => r.data),
+  addStint: (playerId, payload) => api.post(`/players/${playerId}/stints`, payload).then(r => r.data),
+  updateStint: (id, payload) => api.put(`/stints/${id}`, payload).then(r => r.data),
+  deleteStint: (id) => api.delete(`/stints/${id}`),
 
   // Matchs
   getMatchesByCompetition: (competitionId) =>
