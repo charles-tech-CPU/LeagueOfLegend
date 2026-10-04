@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.charles.lolresults.domain.CompetitionGroup;
+import com.charles.lolresults.domain.CompetitionStage;
 import com.charles.lolresults.domain.Match;
 import com.charles.lolresults.domain.MatchPhase;
 import com.charles.lolresults.domain.MatchStatus;
@@ -103,6 +104,39 @@ class StandingsServiceTest {
                 .allSatisfy(
                         row -> assertThat(row.seriesWon() + row.seriesLost()).isZero());
         assertThat(standingsService.computeHeadToHead(COMPETITION_ID, null)).isEmpty();
+    }
+
+    @Test
+    void unNulEnBo2VautUneDemiVictoireEtNeCompteNiGagneNiPerdu() {
+        givenPlayedMatches(
+                match(g2, fnc, 1, 1, MatchPhase.REGULAR_SEASON),
+                match(kc, g2, 1, 1, MatchPhase.REGULAR_SEASON),
+                match(fnc, kc, 2, 0, MatchPhase.REGULAR_SEASON));
+
+        List<StandingRowDto> standings = standingsService.computeStandings(COMPETITION_ID, null);
+
+        // FNC : 1 victoire + 1 nul (3 points) > G2 : 2 nuls (2 points) > KC : 1 nul (1 point)
+        assertThat(standings).extracting(StandingRowDto::teamCode).containsExactly("FNC", "G2", "KC");
+        assertThat(standings.get(1).seriesDrawn()).isEqualTo(2);
+        assertThat(standings.get(1).seriesWon() + standings.get(1).seriesLost()).isZero();
+        assertThat(standingsService.computeHeadToHead(COMPETITION_ID, null))
+                .filteredOn(cell -> cell.teamAId().equals(1L) && cell.teamBId().equals(2L))
+                .singleElement()
+                .satisfies(
+                        cell -> assertThat(cell.seriesWon() + cell.seriesLost()).isZero());
+    }
+
+    @Test
+    void leClassementPeutSeLimiterAUnePhase() {
+        CompetitionStage groups = new CompetitionStage();
+        groups.setId(20L);
+        Match inStage = match(g2, fnc, 1, 0, MatchPhase.REGULAR_SEASON);
+        inStage.setStage(groups);
+        givenPlayedMatches(inStage, match(kc, fnc, 1, 0, MatchPhase.REGULAR_SEASON));
+
+        assertThat(standingsService.computeStandings(COMPETITION_ID, null, 20L))
+                .extracting(StandingRowDto::teamCode)
+                .containsExactly("G2", "FNC");
     }
 
     private void givenPlayedMatches(Match... matches) {

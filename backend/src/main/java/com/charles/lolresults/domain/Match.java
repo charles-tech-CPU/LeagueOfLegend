@@ -34,6 +34,11 @@ public class Match {
     @JoinColumn(name = "competition_group_id")
     private CompetitionGroup group;
 
+    /** Phase de la competition (nul pour les matchs saisis avant l'ajout des phases). */
+    @ManyToOne
+    @JoinColumn(name = "stage_id")
+    private CompetitionStage stage;
+
     /**
      * Libelle libre du round/de la phase : "W1".."W13" pour les semaines de saison
      * reguliere, ou "R1", "QF", "SF", "F", "Losers Bracket R1"... pour les playoffs.

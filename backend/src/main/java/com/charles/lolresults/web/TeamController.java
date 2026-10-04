@@ -1,8 +1,11 @@
 package com.charles.lolresults.web;
 
 import com.charles.lolresults.domain.Team;
+import com.charles.lolresults.domain.TeamName;
 import com.charles.lolresults.dto.TeamCreateDto;
 import com.charles.lolresults.dto.TeamDto;
+import com.charles.lolresults.dto.TeamNameDto;
+import com.charles.lolresults.repository.TeamNameRepository;
 import com.charles.lolresults.repository.TeamRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
@@ -22,9 +25,11 @@ public class TeamController {
     private static final String TEAM_NOT_FOUND = "Equipe introuvable : ";
 
     private final TeamRepository teamRepository;
+    private final TeamNameRepository teamNameRepository;
 
-    public TeamController(TeamRepository teamRepository) {
+    public TeamController(TeamRepository teamRepository, TeamNameRepository teamNameRepository) {
         this.teamRepository = teamRepository;
+        this.teamNameRepository = teamNameRepository;
     }
 
     @GetMapping
@@ -63,6 +68,17 @@ public class TeamController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         teamRepository.deleteById(id);
+    }
+
+    /** Noms successifs de l'equipe, du plus ancien au nom actuel. */
+    @GetMapping("/{id}/names")
+    public List<TeamNameDto> names(@PathVariable Long id) {
+        teamRepository.findById(id).orElseThrow(() -> new EntityNotFoundException(TEAM_NOT_FOUND + id));
+        return teamNameRepository.findByTeamId(id).stream()
+                .sorted(Comparator.comparing(TeamName::getValidFrom, Comparator.nullsFirst(Comparator.naturalOrder()))
+                        .thenComparing(TeamName::getValidTo, Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(TeamNameDto::from)
+                .toList();
     }
 
     @GetMapping("/{id}/logo")

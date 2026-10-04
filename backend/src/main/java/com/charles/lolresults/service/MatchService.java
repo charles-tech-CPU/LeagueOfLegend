@@ -8,6 +8,7 @@ import com.charles.lolresults.repository.CompetitionRepository;
 import com.charles.lolresults.repository.MatchRepository;
 import com.charles.lolresults.repository.TeamRepository;
 import jakarta.persistence.EntityNotFoundException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
@@ -47,12 +48,17 @@ public class MatchService {
                 .toList();
     }
 
-    /** Toutes competitions confondues : sert la page "A venir" (saisie de resultats). */
+    /**
+     * Toutes competitions confondues : sert la page "A venir" (saisie de resultats).
+     * from optionnel : ignore les matchs anterieurs a cette date, pour que les tournois
+     * historiques (matchs sans score) n'envahissent pas la page "A venir".
+     */
     @Transactional(readOnly = true)
-    public List<MatchDto> findByStatus(MatchStatus status) {
-        return matchRepository.findByStatusOrderByDateAscTimeAsc(status).stream()
-                .map(MatchDto::from)
-                .toList();
+    public List<MatchDto> findByStatus(MatchStatus status, LocalDate from) {
+        List<Match> matches = from != null
+                ? matchRepository.findByStatusAndDateGreaterThanEqualOrderByDateAscTimeAsc(status, from)
+                : matchRepository.findByStatusOrderByDateAscTimeAsc(status);
+        return matches.stream().map(MatchDto::from).toList();
     }
 
     public MatchDto create(MatchCreateDto dto) {

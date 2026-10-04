@@ -8,13 +8,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.charles.lolresults.domain.Competition;
+import com.charles.lolresults.domain.CompetitionSplit;
 import com.charles.lolresults.domain.CompetitionType;
+import com.charles.lolresults.domain.MatchStatus;
 import com.charles.lolresults.repository.CompetitionRepository;
+import com.charles.lolresults.repository.MatchRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -33,6 +37,9 @@ class CompetitionControllerTest {
     @MockBean
     private CompetitionRepository competitionRepository;
 
+    @MockBean
+    private MatchRepository matchRepository;
+
     @Test
     void listeTrieeParSaisonDecroissantePuisCode() throws Exception {
         when(competitionRepository.findAll())
@@ -42,6 +49,65 @@ class CompetitionControllerTest {
         mockMvc.perform(get("/api/competitions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].code", contains("LCK", "LCS", "LEC")));
+    }
+
+    @Test
+    void uneSaisonEstRangeeParSplitPuisEvenementsAvecSonAvancement() throws Exception {
+        Competition summer = competition(1L, "LCS", 2013);
+        summer.setSplit(CompetitionSplit.SUMMER);
+        Competition spring = competition(2L, "LCS", 2013);
+        spring.setName("LCS 2013 Spring");
+        spring.setSplit(CompetitionSplit.SPRING);
+        Competition worlds = competition(3L, "WORLDS", 2013);
+        when(competitionRepository.findBySeason(2013)).thenReturn(List.of(worlds, summer, spring));
+        when(matchRepository.countBySeason(2013, MatchStatus.COMPLETED))
+                .thenReturn(List.<Object[]>of(new Object[] {2L, 56L, 10L}));
+
+        mockMvc.perform(get("/api/competitions").param("season", "2013"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", contains(2, 1, 3)))
+                .andExpect(jsonPath("$[0].matchCount").value(56))
+                .andExpect(jsonPath("$[0].playedCount").value(10))
+                .andExpect(jsonPath("$[1].matchCount").value(0));
+    }
+
+    @Test
+    void lesSaisonsSontListeesAvecLeurNombreDeCompetitions() throws Exception {
+        when(competitionRepository.countBySeason())
+                .thenReturn(List.<Object[]>of(new Object[] {2026, 11L}, new Object[] {2013, 20L}));
+
+        mockMvc.perform(get("/api/competitions/seasons"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].season", contains(2026, 2013)))
+                .andExpect(jsonPath("$[1].competitionCount").value(20));
+    }
+
+    @Test
+    void updateModifieLeSplitEtLesDates() throws Exception {
+        Competition lec = competition(1L, "LEC", 2026);
+        when(competitionRepository.findById(1L)).thenReturn(Optional.of(lec));
+        when(competitionRepository.save(any(Competition.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockMvc.perform(put("/api/competitions/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"LEC\",\"name\":\"LEC 2026 Summer\",\"type\":\"REGIONAL_LEAGUE\","
+                                + "\"season\":2026,\"split\":\"SUMMER\",\"startDate\":\"2026-07-24\","
+                                + "\"endDate\":\"2026-09-20\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.split").value("SUMMER"))
+                .andExpect(jsonPath("$.startDate").value("2026-07-24"));
+    }
+
+    @Test
+    void desDatesInverseesSontRefusees() throws Exception {
+        when(competitionRepository.findById(1L)).thenReturn(Optional.of(competition(1L, "LEC", 2026)));
+
+        mockMvc.perform(put("/api/competitions/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"LEC\",\"name\":\"LEC\",\"type\":\"REGIONAL_LEAGUE\",\"season\":2026,"
+                                + "\"startDate\":\"2026-09-20\",\"endDate\":\"2026-07-24\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("La date de fin doit etre posterieure a la date de debut"));
     }
 
     @Test

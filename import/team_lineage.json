@@ -1,0 +1,7 @@
+{
+  "_doc": "Liens de filiation que Leaguepedia ne trace pas comme un renommage (fusion, rachat d'une equipe qui en garde l'histoire). 'from' devient 'to' a la date donnee. A completer au besoin, puis regenerer les migrations.",
+  "links": [
+    {"from": "SK Telecom T1 K", "to": "SK Telecom T1", "date": "2014-12-01", "note": "fusion de SKT K et SKT S, l'equipe reprend l'histoire de SKT K"},
+    {"from": "Samsung Galaxy", "to": "KSV eSports", "date": "2017-11-30", "note": "rachat de Samsung Galaxy : Gen.G en revendique l'histoire"}
+  ]
+}

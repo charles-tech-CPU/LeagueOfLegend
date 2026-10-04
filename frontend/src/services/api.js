@@ -14,11 +14,24 @@ export function teamLogoUrl(teamId) {
 export default {
   // Competitions
   getCompetitions: () => api.get('/competitions').then(r => r.data),
+  // Competitions d'une saison, avec leur avancement (matchCount / playedCount)
+  getCompetitionsBySeason: (season) => api.get('/competitions', { params: { season } }).then(r => r.data),
+  getSeasons: () => api.get('/competitions/seasons').then(r => r.data),
+  getCompetition: (id) => api.get(`/competitions/${id}`).then(r => r.data),
   createCompetition: (payload) => api.post('/competitions', payload).then(r => r.data),
+  updateCompetition: (id, payload) => api.put(`/competitions/${id}`, payload).then(r => r.data),
+
+  // Phases d'une competition (format) : la creation genere les matchs
+  getStages: (competitionId) => api.get(`/competitions/${competitionId}/stages`).then(r => r.data),
+  createStage: (competitionId, payload) => api.post(`/competitions/${competitionId}/stages`, payload).then(r => r.data),
+  nextSwissRound: (stageId, date) => api.post(`/stages/${stageId}/next-round`, null, { params: { date } }).then(r => r.data),
+  deleteStage: (stageId) => api.delete(`/stages/${stageId}`),
 
   // Equipes
   getTeams: () => api.get('/teams').then(r => r.data),
   getTeam: (id) => api.get(`/teams/${id}`).then(r => r.data),
+  // Noms successifs de l'equipe (ex: SK Telecom T1 -> T1), du plus ancien au nom actuel
+  getTeamNames: (id) => api.get(`/teams/${id}/names`).then(r => r.data),
   createTeam: (payload) => api.post('/teams', payload).then(r => r.data),
   updateTeam: (id, payload) => api.put(`/teams/${id}`, payload).then(r => r.data),
   deleteTeam: (id) => api.delete(`/teams/${id}`),
@@ -42,8 +55,9 @@ export default {
   // Matchs
   getMatchesByCompetition: (competitionId) =>
     api.get('/matches', { params: { competitionId } }).then(r => r.data),
-  getScheduledMatches: () =>
-    api.get('/matches', { params: { status: 'SCHEDULED' } }).then(r => r.data),
+  // from : ignore les matchs plus anciens (tournois historiques sans score)
+  getScheduledMatches: (from) =>
+    api.get('/matches', { params: { status: 'SCHEDULED', from } }).then(r => r.data),
   createMatch: (payload) => api.post('/matches', payload).then(r => r.data),
   updateMatch: (id, payload) => api.put(`/matches/${id}`, payload).then(r => r.data),
   deleteMatch: (id) => api.delete(`/matches/${id}`),

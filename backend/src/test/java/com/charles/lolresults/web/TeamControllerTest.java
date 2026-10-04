@@ -7,10 +7,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.charles.lolresults.domain.Team;
+import com.charles.lolresults.domain.TeamName;
 import com.charles.lolresults.dto.TeamCreateDto;
 import com.charles.lolresults.dto.TeamDto;
+import com.charles.lolresults.dto.TeamNameDto;
+import com.charles.lolresults.repository.TeamNameRepository;
 import com.charles.lolresults.repository.TeamRepository;
 import jakarta.persistence.EntityNotFoundException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -27,6 +31,9 @@ class TeamControllerTest {
 
     @Mock
     private TeamRepository teamRepository;
+
+    @Mock
+    private TeamNameRepository teamNameRepository;
 
     @InjectMocks
     private TeamController teamController;
@@ -109,6 +116,32 @@ class TeamControllerTest {
 
         assertThat(teamController.logo(1L).getHeaders().getContentType()).isEqualTo(MediaType.IMAGE_PNG);
         assertThat(teamController.logo(1L).getBody()).containsExactly(1, 2);
+    }
+
+    @Test
+    void lesNomsSuccessifsSontDuPlusAncienAuNomActuel() {
+        Team t1 = team();
+        when(teamRepository.findById(1L)).thenReturn(Optional.of(t1));
+        when(teamNameRepository.findByTeamId(1L))
+                .thenReturn(List.of(
+                        name(t1, "T1", LocalDate.of(2019, 12, 8), null),
+                        name(t1, "SK Telecom T1 2", null, LocalDate.of(2013, 11, 11)),
+                        name(t1, "SK Telecom T1", LocalDate.of(2014, 12, 1), LocalDate.of(2019, 12, 7))));
+
+        assertThat(teamController.names(1L))
+                .extracting(TeamNameDto::name)
+                .containsExactly("SK Telecom T1 2", "SK Telecom T1", "T1");
+        when(teamRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> teamController.names(99L)).isInstanceOf(EntityNotFoundException.class);
+    }
+
+    private static TeamName name(Team team, String value, LocalDate from, LocalDate to) {
+        TeamName name = new TeamName();
+        name.setTeam(team);
+        name.setName(value);
+        name.setValidFrom(from);
+        name.setValidTo(to);
+        return name;
     }
 
     private static Team team() {

@@ -31,16 +31,24 @@ public class StandingsService {
     }
 
     public List<StandingRowDto> computeStandings(Long competitionId, Long groupId) {
+        return computeStandings(competitionId, groupId, null);
+    }
+
+    /**
+     * stageId optionnel : limite le classement a une phase (utile quand une competition
+     * enchaine deux phases de poules). Un nul (BO2 a 1-1) vaut une demi-victoire au classement.
+     */
+    public List<StandingRowDto> computeStandings(Long competitionId, Long groupId, Long stageId) {
         Map<Long, TeamTally> byTeam = new LinkedHashMap<>();
 
-        for (Match m : playedMatches(competitionId, groupId)) {
+        for (Match m : playedMatches(competitionId, groupId, stageId)) {
             tallyFor(byTeam, m.getTeam1()).addResult(m.getScore1(), m.getScore2());
             tallyFor(byTeam, m.getTeam2()).addResult(m.getScore2(), m.getScore1());
         }
 
         return byTeam.values().stream()
                 .map(TeamTally::toDto)
-                .sorted(Comparator.comparingInt(StandingRowDto::seriesWon)
+                .sorted(Comparator.comparingInt((StandingRowDto r) -> 2 * r.seriesWon() + r.seriesDrawn())
                         .reversed()
                         .thenComparing(StandingRowDto::seriesLost)
                         .thenComparing(Comparator.comparingInt(StandingRowDto::gamesWon)
@@ -49,9 +57,13 @@ public class StandingsService {
     }
 
     public List<HeadToHeadCellDto> computeHeadToHead(Long competitionId, Long groupId) {
+        return computeHeadToHead(competitionId, groupId, null);
+    }
+
+    public List<HeadToHeadCellDto> computeHeadToHead(Long competitionId, Long groupId, Long stageId) {
         Map<Long, Map<Long, int[]>> tally = new LinkedHashMap<>();
 
-        for (Match m : playedMatches(competitionId, groupId)) {
+        for (Match m : playedMatches(competitionId, groupId, stageId)) {
             addH2H(tally, m.getTeam1().getId(), m.getTeam2().getId(), m.getScore1(), m.getScore2());
             addH2H(tally, m.getTeam2().getId(), m.getTeam1().getId(), m.getScore2(), m.getScore1());
         }
@@ -68,13 +80,15 @@ public class StandingsService {
      * equipes dans un bracket (voir MatchService.propagateAdvancement) mais
      * ne doivent jamais influencer un classement de saison reguliere.
      */
-    private List<Match> playedMatches(Long competitionId, Long groupId) {
+    private List<Match> playedMatches(Long competitionId, Long groupId, Long stageId) {
         return matchRepository
                 .findByCompetitionIdAndStatusOrderByDateAscTimeAsc(competitionId, MatchStatus.COMPLETED)
                 .stream()
                 .filter(m -> m.getPhase() == MatchPhase.REGULAR_SEASON)
                 .filter(m -> groupId == null
                         || (m.getGroup() != null && groupId.equals(m.getGroup().getId())))
+                .filter(m -> stageId == null
+                        || (m.getStage() != null && stageId.equals(m.getStage().getId())))
                 .toList();
     }
 
@@ -90,7 +104,7 @@ public class StandingsService {
                 tally.computeIfAbsent(teamAId, id -> new LinkedHashMap<>()).computeIfAbsent(teamBId, id -> new int[2]);
         if (scoreA > scoreB) {
             wl[0]++;
-        } else {
+        } else if (scoreA < scoreB) {
             wl[1]++;
         }
     }
@@ -99,6 +113,7 @@ public class StandingsService {
     private static final class TeamTally {
         private final Team team;
         private int seriesWon;
+        private int seriesDrawn;
         private int seriesLost;
         private int gamesWon;
         private int gamesLost;
@@ -113,8 +128,10 @@ public class StandingsService {
             }
             if (scoreFor > scoreAgainst) {
                 seriesWon++;
-            } else {
+            } else if (scoreFor < scoreAgainst) {
                 seriesLost++;
+            } else {
+                seriesDrawn++;
             }
             gamesWon += scoreFor;
             gamesLost += scoreAgainst;
@@ -127,6 +144,7 @@ public class StandingsService {
                     team.getName(),
                     team.getLogo() != null,
                     seriesWon,
+                    seriesDrawn,
                     seriesLost,
                     gamesWon,
                     gamesLost);

@@ -6,6 +6,8 @@ public record StandingRowDto(
         String teamName,
         boolean teamHasLogo,
         int seriesWon,
+        /** Series nulles (BO2 a 1-1), toujours 0 hors BO2. */
+        int seriesDrawn,
         int seriesLost,
         int gamesWon,
         int gamesLost) {}

@@ -3,3 +3,4 @@
 .idea/
 Claude outputs/
 __pycache__/
+import/cache/

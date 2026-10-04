@@ -8,6 +8,9 @@
         <span v-if="team" class="code-badge">{{ team.code }}</span>
         <h1>{{ team?.name ?? '...' }}</h1>
         <p v-if="team?.region" class="hero-sub">{{ team.region }}</p>
+        <p v-if="formerNames.length" class="hero-sub former">
+          Anciennement {{ formerNames.map(n => n.name).join(', ') }}
+        </p>
       </div>
     </div>
     <div v-if="loaded" class="hero-stats">
@@ -35,6 +38,19 @@
       <span class="tab-icon">{{ t.icon }}</span>{{ t.label }}
     </button>
   </div>
+
+  <section v-if="activeTab === 'history'" class="tab-panel">
+    <ol class="name-timeline">
+      <li v-for="n in names" :key="n.name" :class="{ current: !n.validTo }">
+        <span class="name-dot" aria-hidden="true"></span>
+        <div>
+          <strong>{{ n.name }}</strong>
+          <span v-if="n.shortName" class="name-short">{{ n.shortName }}</span>
+          <p class="name-period">{{ namePeriod(n) }}</p>
+        </div>
+      </li>
+    </ol>
+  </section>
 
   <section v-if="activeTab === 'roster'" class="tab-panel">
     <div class="roster">
@@ -114,12 +130,19 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import api, { teamLogoUrl } from '../services/api'
 import { POSITIONS } from '../positions'
+import { fullDay } from '../format'
 import CountryFlag from '../components/CountryFlag.vue'
 import CountrySelect from '../components/CountrySelect.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
 
-const tabs = [{ key: 'roster', label: 'Effectif', icon: '👥' }]
+const names = ref([])
+// Noms portes avant le nom actuel (le dernier de l'historique est le nom actuel).
+const formerNames = computed(() => names.value.filter(n => n.validTo))
+const tabs = computed(() => [
+  { key: 'roster', label: 'Effectif', icon: '👥' },
+  ...(names.value.length > 1 ? [{ key: 'history', label: 'Historique du nom', icon: '📜' }] : [])
+])
 const activeTab = ref('roster')
 
 const team = ref(null)
@@ -144,6 +167,12 @@ const playersByPosition = computed(() => {
 
 const filledPositions = computed(() => POSITIONS.filter(p => playersByPosition.value[p.key].length).length)
 
+function namePeriod(n) {
+  const from = n.validFrom ? fullDay(n.validFrom) : 'Origine'
+  const to = n.validTo ? fullDay(n.validTo) : "aujourd'hui"
+  return `${from} → ${to}`
+}
+
 function apiError(e, fallback) {
   return e.response?.data?.error ?? fallback
 }
@@ -151,7 +180,8 @@ function apiError(e, fallback) {
 async function load() {
   error.value = ''
   try {
-    const [t, p] = await Promise.all([api.getTeam(props.id), api.getPlayers(props.id)])
+    const [t, p, n] = await Promise.all([api.getTeam(props.id), api.getPlayers(props.id), api.getTeamNames(props.id)])
+    names.value = n
     team.value = t
     players.value = p
   } catch (e) {
@@ -345,6 +375,67 @@ watch(() => props.id, load)
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }
+}
+
+.former {
+  margin-top: 4px;
+  font-size: 0.82em;
+  color: var(--text-dim);
+}
+
+/* ---------- Historique du nom ---------- */
+.name-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 26px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.name-timeline::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--border-strong), var(--accent));
+}
+.name-timeline li {
+  position: relative;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+.name-timeline li.current {
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow: var(--glow);
+}
+.name-dot {
+  position: absolute;
+  left: -26px;
+  top: 16px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--border-strong);
+}
+.name-timeline li.current .name-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.name-short {
+  margin-left: 8px;
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+.name-period {
+  margin: 4px 0 0;
+  font-size: 0.85em;
+  color: var(--text-muted);
 }
 
 /* ---------- Effectif : une carte par poste ---------- */

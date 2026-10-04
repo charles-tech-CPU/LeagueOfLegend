@@ -186,7 +186,7 @@ class MatchServiceTest {
 
         assertThat(matchService.findByCompetition(1L)).hasSize(1);
         assertThat(matchService.findByTeam(1L)).hasSize(1);
-        assertThat(matchService.findByStatus(MatchStatus.SCHEDULED)).isEmpty();
+        assertThat(matchService.findByStatus(MatchStatus.SCHEDULED, null)).isEmpty();
 
         matchService.delete(1L);
         verify(matchRepository).deleteById(1L);

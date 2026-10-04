@@ -60,9 +60,10 @@ class MatchControllerTest {
 
     @Test
     void rechercheParStatut() throws Exception {
-        when(matchService.findByStatus(MatchStatus.SCHEDULED)).thenReturn(List.of());
+        when(matchService.findByStatus(MatchStatus.SCHEDULED, LocalDate.of(2026, 1, 1)))
+                .thenReturn(List.of());
 
-        mockMvc.perform(get("/api/matches").param("status", "SCHEDULED"))
+        mockMvc.perform(get("/api/matches").param("status", "SCHEDULED").param("from", "2026-01-01"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }

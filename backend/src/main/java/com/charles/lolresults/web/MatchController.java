@@ -5,6 +5,7 @@ import com.charles.lolresults.dto.MatchCreateDto;
 import com.charles.lolresults.dto.MatchDto;
 import com.charles.lolresults.service.MatchService;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -19,12 +20,16 @@ public class MatchController {
         this.matchService = matchService;
     }
 
-    /** GET /api/matches?competitionId=1  ou  GET /api/matches?teamId=3  ou  GET /api/matches?status=SCHEDULED */
+    /**
+     * GET /api/matches?competitionId=1  ou  ?teamId=3  ou  ?status=SCHEDULED (&from=2026-01-01
+     * pour ignorer les matchs plus anciens).
+     */
     @GetMapping
     public List<MatchDto> find(
             @RequestParam(required = false) Long competitionId,
             @RequestParam(required = false) Long teamId,
-            @RequestParam(required = false) MatchStatus status) {
+            @RequestParam(required = false) MatchStatus status,
+            @RequestParam(required = false) LocalDate from) {
         if (competitionId != null) {
             return matchService.findByCompetition(competitionId);
         }
@@ -32,7 +37,7 @@ public class MatchController {
             return matchService.findByTeam(teamId);
         }
         if (status != null) {
-            return matchService.findByStatus(status);
+            return matchService.findByStatus(status, from);
         }
         throw new IllegalArgumentException("Precise competitionId, teamId ou status en parametre de requete");
     }

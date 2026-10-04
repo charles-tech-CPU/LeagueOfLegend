@@ -25,7 +25,7 @@
           </span>
         </td>
         <td class="num record">
-          <span class="w">{{ row.seriesWon }}</span><span class="sep">-</span><span class="l">{{ row.seriesLost }}</span>
+          <span class="w">{{ row.seriesWon }}</span><span class="sep">-</span><template v-if="row.seriesDrawn"><span class="d" title="Nuls (BO2)">{{ row.seriesDrawn }}</span><span class="sep">-</span></template><span class="l">{{ row.seriesLost }}</span>
         </td>
         <td class="rate-col">
           <span class="rate">
@@ -91,9 +91,11 @@ function formOf(teamId) {
   return (formByTeam.value.get(teamId) ?? []).slice(-FORM_LENGTH)
 }
 
+// Un nul (BO2 a 1-1) compte pour une demi-victoire.
 function winRate(row) {
-  const total = row.seriesWon + row.seriesLost
-  return total ? Math.round((row.seriesWon / total) * 100) : 0
+  const drawn = row.seriesDrawn ?? 0
+  const total = row.seriesWon + drawn + row.seriesLost
+  return total ? Math.round(((row.seriesWon + drawn / 2) / total) * 100) : 0
 }
 
 function gameDiff(row) {
@@ -185,6 +187,9 @@ function diffTone(row) {
 }
 .record .l {
   color: var(--loss);
+}
+.record .d {
+  color: var(--text-muted);
 }
 .record .sep {
   color: var(--text-dim);

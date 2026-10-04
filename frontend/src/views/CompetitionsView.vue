@@ -1,10 +1,22 @@
 <template>
   <header class="page-head">
     <h1>Compétitions</h1>
-    <p class="subtitle">Choisis une ligue pour voir son classement, son bracket et ses résultats.</p>
+    <p class="subtitle">Choisis une saison, puis une ligue pour voir son classement, son bracket et ses résultats.</p>
   </header>
 
-  <template v-for="section in sections" :key="section.type">
+  <nav v-if="seasons.length" class="seasons" aria-label="Saisons">
+    <router-link
+      v-for="s in seasons"
+      :key="s.season"
+      :to="{ query: { season: s.season } }"
+      class="season-chip"
+      :class="{ active: s.season === season }"
+    >
+      {{ s.season }}<span class="season-count">{{ s.competitionCount }}</span>
+    </router-link>
+  </nav>
+
+  <template v-for="section in sections" :key="section.key">
     <h2 v-if="section.items.length">{{ section.label }}</h2>
     <div v-if="section.items.length" class="grid">
       <router-link
@@ -16,70 +28,84 @@
       >
         <span class="card-top">
           <span class="league-badge">{{ c.code }}</span>
-          <span v-if="stats[c.id]?.status" class="state" :class="stats[c.id].status.tone">{{ stats[c.id].status.label }}</span>
+          <span class="state" :class="statusOf(c).tone">{{ statusOf(c).label }}</span>
         </span>
         <span class="comp-name">{{ c.name }}</span>
-        <span class="comp-meta">{{ c.region ?? 'International' }} · Saison {{ c.season }}</span>
-        <span v-if="stats[c.id]" class="comp-progress">
-          <span class="bar"><span :style="{ width: `${stats[c.id].percent}%` }"></span></span>
-          <span class="progress-label">{{ stats[c.id].played }}/{{ stats[c.id].total }} matchs</span>
+        <span class="comp-meta">
+          {{ c.region ?? 'International' }}<template v-if="c.split"> · {{ splitLabel(c.split) }}</template>
+          <template v-if="c.startDate"> · {{ shortDate(c.startDate) }} → {{ shortDate(c.endDate) }}</template>
+        </span>
+        <span class="comp-progress">
+          <span class="bar"><span :style="{ width: `${percent(c)}%` }"></span></span>
+          <span class="progress-label">{{ c.playedCount }}/{{ c.matchCount }} matchs</span>
         </span>
         <span class="comp-cta">Voir la compétition →</span>
       </router-link>
     </div>
   </template>
-  <p v-if="!competitions.length && loaded" class="muted">Aucune compétition pour l'instant.</p>
+  <p v-if="loaded && !competitions.length" class="muted">
+    {{ season ? `Aucune compétition en ${season}.` : "Aucune compétition pour l'instant." }}
+  </p>
 
   <h2>Ajouter une compétition</h2>
   <form class="inline" @submit.prevent="submit">
-    <input v-model="form.code" placeholder="Code (ex: LEC)" aria-label="Code" required />
-    <input v-model="form.name" placeholder="Nom (ex: LEC 2026)" aria-label="Nom" required />
+    <input v-model="form.code" placeholder="Code (ex: LCS)" aria-label="Code" required />
+    <input v-model="form.name" placeholder="Nom (ex: EU LCS 2013 Spring)" aria-label="Nom" required />
     <select v-model="form.type" aria-label="Type de compétition">
       <option value="REGIONAL_LEAGUE">Ligue régionale</option>
       <option value="INTERNATIONAL_EVENT">Événement international</option>
     </select>
     <input v-model="form.region" placeholder="Région (ex: EMEA)" aria-label="Région" />
-    <input v-model.number="form.season" type="number" placeholder="Saison" aria-label="Saison" required />
-    <button type="submit">Ajouter</button>
+    <input v-model.number="form.season" class="year" type="number" min="2009" placeholder="Saison" aria-label="Saison" required />
+    <select v-model="form.split" aria-label="Split">
+      <option :value="null">Sans split (événement)</option>
+      <option v-for="s in SPLITS" :key="s.key" :value="s.key">{{ s.label }}</option>
+    </select>
+    <button type="submit">Créer</button>
   </form>
+  <p class="hint">Une fois créée, ajoute ses phases (poules, swiss, bracket…) depuis l'onglet <strong>Format</strong> : les matchs sont générés automatiquement.</p>
   <p v-if="error" class="error">{{ error }}</p>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
 import { leagueColor } from '../leagueColors'
+import { SPLITS, splitLabel } from '../formats'
 
+const route = useRoute()
+const router = useRouter()
+
+const seasons = ref([])
 const competitions = ref([])
 const loaded = ref(false)
 const error = ref('')
-const stats = reactive({})
 
-const sections = computed(() => [
-  { type: 'REGIONAL_LEAGUE', label: 'Ligues régionales', items: competitions.value.filter(c => c.type === 'REGIONAL_LEAGUE') },
-  { type: 'INTERNATIONAL_EVENT', label: 'Événements internationaux', items: competitions.value.filter(c => c.type !== 'REGIONAL_LEAGUE') }
-])
+// Saison choisie dans l'URL (?season=2013), la plus recente par defaut.
+const season = computed(() => Number(route.query.season) || seasons.value[0]?.season || null)
 
-function statusOf(matches) {
-  const played = matches.filter(m => m.status === 'COMPLETED').length
-  if (!matches.length || played === 0) return { label: 'À venir', tone: 'soon' }
-  if (played === matches.length) return { label: 'Terminé', tone: 'done' }
+const sections = computed(() => {
+  const regional = competitions.value.filter(c => c.type === 'REGIONAL_LEAGUE')
+  return [
+    ...SPLITS.map(s => ({ key: s.key, label: `Split ${s.label}`, items: regional.filter(c => c.split === s.key) })),
+    { key: 'regional', label: 'Autres compétitions régionales', items: regional.filter(c => !c.split) },
+    { key: 'international', label: 'Événements internationaux', items: competitions.value.filter(c => c.type !== 'REGIONAL_LEAGUE') }
+  ]
+})
+
+function percent(c) {
+  return c.matchCount ? Math.round((c.playedCount / c.matchCount) * 100) : 0
+}
+
+function statusOf(c) {
+  if (!c.matchCount || c.playedCount === 0) return { label: 'À venir', tone: 'soon' }
+  if (c.playedCount === c.matchCount) return { label: 'Terminé', tone: 'done' }
   return { label: 'En cours', tone: 'live' }
 }
 
-// Avancement de chaque competition (charge en tache de fond, la grille
-// s'affiche sans attendre).
-async function loadStats() {
-  await Promise.all(competitions.value.map(async c => {
-    const matches = await api.getMatchesByCompetition(c.id)
-    const played = matches.filter(m => m.status === 'COMPLETED').length
-    stats[c.id] = {
-      played,
-      total: matches.length,
-      percent: matches.length ? Math.round((played / matches.length) * 100) : 0,
-      status: statusOf(matches)
-    }
-  }))
+function shortDate(iso) {
+  return iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '?'
 }
 
 const form = reactive({
@@ -87,32 +113,80 @@ const form = reactive({
   name: '',
   type: 'REGIONAL_LEAGUE',
   region: '',
-  season: new Date().getFullYear()
+  season: new Date().getFullYear(),
+  split: null
 })
 
-async function load() {
-  competitions.value = await api.getCompetitions()
+async function loadSeason() {
+  competitions.value = season.value ? await api.getCompetitionsBySeason(season.value) : []
   loaded.value = true
-  loadStats()
+}
+
+async function load() {
+  seasons.value = await api.getSeasons()
+  await loadSeason()
 }
 
 async function submit() {
   error.value = ''
   try {
-    await api.createCompetition({ ...form })
-    form.code = ''
-    form.name = ''
-    form.region = ''
-    await load()
+    const created = await api.createCompetition({ ...form })
+    router.push(`/competitions/${created.id}?tab=format`)
   } catch (e) {
-    error.value = e.response?.data?.error ?? "Erreur lors de la création."
+    error.value = e.response?.data?.error ?? 'Erreur lors de la création.'
   }
 }
 
+watch(() => route.query.season, loadSeason)
 onMounted(load)
 </script>
 
 <style scoped>
+.seasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+.season-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-family: "Outfit", sans-serif;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.season-chip:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.season-chip.active {
+  color: #0a0c18;
+  background: var(--accent-grad);
+  border-color: transparent;
+  box-shadow: 0 6px 18px -8px rgba(129, 140, 248, 0.9);
+}
+.season-count {
+  font-size: 0.75em;
+  font-weight: 600;
+  opacity: 0.75;
+}
+.year {
+  width: 100px;
+}
+.hint {
+  font-size: 0.86em;
+  color: var(--text-muted);
+  margin: -12px 0 20px;
+}
+.hint strong {
+  color: var(--text);
+}
 .page-head h1 {
   margin-bottom: 4px;
 }

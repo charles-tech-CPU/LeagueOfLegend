@@ -1,5 +1,7 @@
 <template>
-  <router-link to="/" class="back">← Toutes les compétitions</router-link>
+  <router-link :to="competition ? { path: '/', query: { season: competition.season } } : '/'" class="back">
+    ← Toutes les compétitions{{ competition ? ` ${competition.season}` : '' }}
+  </router-link>
 
   <header class="hero" :style="{ '--league-color': leagueColor(competition?.code) }">
     <div class="hero-main">
@@ -8,7 +10,7 @@
       <p v-if="competition" class="hero-sub">
         {{ competition.type === 'REGIONAL_LEAGUE' ? 'Ligue régionale' : 'Événement international' }}
         <template v-if="competition.region"> · {{ competition.region }}</template>
-        · Saison {{ competition.season }}
+        · Saison {{ competition.season }}<template v-if="competition.split"> · Split {{ splitLabel(competition.split) }}</template>
       </p>
     </div>
     <div v-if="loaded" class="hero-stats">
@@ -76,6 +78,10 @@
     <PlayoffBracket :matches="regionalFinalsMatches" :teams="teams" />
   </section>
 
+  <section v-if="activeTab === 'format' && competition" class="tab-panel">
+    <StageManager :competition="competition" :stages="stages" :teams="teams" @changed="load" />
+  </section>
+
   <section v-if="activeTab === 'calendar'" class="tab-panel">
     <div class="table-scroll">
     <table v-if="sortedMatches.length">
@@ -126,6 +132,7 @@
       <input v-model="newMatch.time" type="time" aria-label="Heure" />
       <select v-model="newMatch.bestOf" aria-label="Format (best of)">
         <option value="BO1">BO1</option>
+        <option value="BO2">BO2</option>
         <option value="BO3">BO3</option>
         <option value="BO5">BO5</option>
       </select>
@@ -179,6 +186,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import api from '../services/api'
 import StandingsTable from '../components/StandingsTable.vue'
 import HeadToHeadTable from '../components/HeadToHeadTable.vue'
@@ -188,6 +196,8 @@ import { longDay } from '../format'
 import { canSave, kickoff, toEditForm, toMatchPayload } from '../matchEdit'
 import { useSort } from '../composables/useSort'
 import MatchEditCells from '../components/MatchEditCells.vue'
+import StageManager from '../components/StageManager.vue'
+import { splitLabel } from '../formats'
 
 const props = defineProps({
   id: { type: [String, Number], required: true }
@@ -200,6 +210,8 @@ const teams = ref([])
 const loaded = ref(false)
 const error = ref('')
 const edits = reactive({})
+const stages = ref([])
+const route = useRoute()
 const activeTab = ref('standings')
 
 const playoffMatches = computed(() => matches.value.filter(m => m.phase === 'PLAYOFFS' && !(m.bracketSide ?? '').startsWith('REGIONAL_')))
@@ -210,7 +222,8 @@ const tabs = computed(() => [
   { key: 'bracket', label: 'Bracket', icon: '🏆' },
   ...(regionalFinalsMatches.value.length ? [{ key: 'regionalFinals', label: 'Regional Finals', icon: '🌏' }] : []),
   { key: 'h2h', label: 'Confrontations', icon: '⚔️' },
-  { key: 'calendar', label: 'Calendrier', icon: '📅' }
+  { key: 'calendar', label: 'Calendrier', icon: '📅' },
+  { key: 'format', label: 'Format', icon: '🧩' }
 ])
 
 const playedCount = computed(() => matches.value.filter(m => m.status === 'COMPLETED').length)
@@ -351,14 +364,16 @@ const standingsPanels = computed(() => {
 
 async function load() {
   const competitionId = Number(props.id)
-  const [competitions, matchList, teamList] = await Promise.all([
-    api.getCompetitions(),
+  const [competitionData, matchList, teamList, stageList] = await Promise.all([
+    api.getCompetition(competitionId),
     api.getMatchesByCompetition(competitionId),
-    api.getTeams()
+    api.getTeams(),
+    api.getStages(competitionId)
   ])
-  competition.value = competitions.find(c => c.id === competitionId) ?? null
+  competition.value = competitionData
   matches.value = matchList
   teams.value = teamList
+  stages.value = stageList
 
   const groups = [...new Map(
     matchList.filter(m => m.groupId != null).map(m => [m.groupId, m.groupName])
@@ -410,7 +425,11 @@ async function submitMatch() {
 async function initialLoad() {
   activeTab.value = 'standings'
   await load()
-  if (standingsPanels.value.every(p => p.rows.length === 0) && playoffMatches.value.length) {
+  // ?tab=format a l'arrivee depuis la creation d'une competition ; sinon le bracket
+  // s'il n'y a pas de classement a montrer.
+  if (route.query.tab && tabs.value.some(t => t.key === route.query.tab)) {
+    activeTab.value = route.query.tab
+  } else if (standingsPanels.value.every(p => p.rows.length === 0) && playoffMatches.value.length) {
     activeTab.value = 'bracket'
   }
 }

@@ -23,9 +23,10 @@ const SIDE_LABELS = {
   REGIONAL_UPPER: 'Bracket vainqueurs',
   REGIONAL_LOWER: 'Bracket perdants',
   KNOCKOUT: 'Knockout Matches',
+  TIEBREAKER: 'Matchs de départage',
   AUTRE: 'Playoffs'
 }
-const SIDE_ORDER = ['GROUP', 'SWISS_STAGE', 'KNOCKOUT', 'PLACEMENT', 'SEEDING', 'PLAY_IN', 'AUTRE', 'BRACKET', 'UPPER', 'LOWER', 'GRAND_FINAL', 'REGIONAL_UPPER', 'REGIONAL_LOWER']
+const SIDE_ORDER = ['GROUP', 'SWISS_STAGE', 'TIEBREAKER', 'KNOCKOUT', 'PLACEMENT', 'SEEDING', 'PLAY_IN', 'AUTRE', 'BRACKET', 'UPPER', 'LOWER', 'GRAND_FINAL', 'REGIONAL_UPPER', 'REGIONAL_LOWER']
 
 // Cotes reunis dans un meme tableau (les traits les relient entre eux, et la
 // grande finale se place entre la finale du haut et celle du bas).

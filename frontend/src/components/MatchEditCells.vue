@@ -11,6 +11,7 @@
   <td>
     <select v-model="edit.bestOf" aria-label="Format (best of)">
       <option value="BO1">BO1</option>
+      <option value="BO2">BO2</option>
       <option value="BO3">BO3</option>
       <option value="BO5">BO5</option>
     </select>

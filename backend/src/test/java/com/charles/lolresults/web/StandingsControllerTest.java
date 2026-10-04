@@ -26,8 +26,8 @@ class StandingsControllerTest {
 
     @Test
     void classementDUnGroupe() throws Exception {
-        when(standingsService.computeStandings(1L, 2L))
-                .thenReturn(List.of(new StandingRowDto(7L, "G2", "G2 Esports", false, 3, 1, 7, 3)));
+        when(standingsService.computeStandings(1L, 2L, null))
+                .thenReturn(List.of(new StandingRowDto(7L, "G2", "G2 Esports", false, 3, 0, 1, 7, 3)));
 
         mockMvc.perform(get("/api/standings").param("competitionId", "1").param("groupId", "2"))
                 .andExpect(status().isOk())
@@ -37,7 +37,8 @@ class StandingsControllerTest {
 
     @Test
     void teteATeteSansGroupe() throws Exception {
-        when(standingsService.computeHeadToHead(1L, null)).thenReturn(List.of(new HeadToHeadCellDto(7L, 8L, 2, 0)));
+        when(standingsService.computeHeadToHead(1L, null, null))
+                .thenReturn(List.of(new HeadToHeadCellDto(7L, 8L, 2, 0)));
 
         mockMvc.perform(get("/api/head-to-head").param("competitionId", "1"))
                 .andExpect(status().isOk())

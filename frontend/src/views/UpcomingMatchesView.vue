@@ -117,7 +117,8 @@ const dayHeaders = computed(() => {
 
 async function load() {
   const [matchList, teamList] = await Promise.all([
-    api.getScheduledMatches(),
+    // Depuis le 1er janvier : les tournois historiques (matchs sans score) restent dans leur page.
+    api.getScheduledMatches(`${new Date().getFullYear()}-01-01`),
     api.getTeams()
   ])
   matches.value = matchList

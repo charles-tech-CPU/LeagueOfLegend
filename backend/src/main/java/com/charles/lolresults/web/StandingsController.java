@@ -17,17 +17,21 @@ public class StandingsController {
         this.standingsService = standingsService;
     }
 
-    /** GET /api/standings?competitionId=1&groupId=2 (groupId optionnel) */
+    /** GET /api/standings?competitionId=1&groupId=2&stageId=3 (groupId et stageId optionnels) */
     @GetMapping("/api/standings")
     public List<StandingRowDto> standings(
-            @RequestParam Long competitionId, @RequestParam(required = false) Long groupId) {
-        return standingsService.computeStandings(competitionId, groupId);
+            @RequestParam Long competitionId,
+            @RequestParam(required = false) Long groupId,
+            @RequestParam(required = false) Long stageId) {
+        return standingsService.computeStandings(competitionId, groupId, stageId);
     }
 
-    /** GET /api/head-to-head?competitionId=1&groupId=2 (groupId optionnel) */
+    /** GET /api/head-to-head?competitionId=1&groupId=2&stageId=3 (groupId et stageId optionnels) */
     @GetMapping("/api/head-to-head")
     public List<HeadToHeadCellDto> headToHead(
-            @RequestParam Long competitionId, @RequestParam(required = false) Long groupId) {
-        return standingsService.computeHeadToHead(competitionId, groupId);
+            @RequestParam Long competitionId,
+            @RequestParam(required = false) Long groupId,
+            @RequestParam(required = false) Long stageId) {
+        return standingsService.computeHeadToHead(competitionId, groupId, stageId);
     }
 }

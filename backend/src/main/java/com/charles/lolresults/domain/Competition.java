@@ -1,13 +1,15 @@
 package com.charles.lolresults.domain;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Une competition = une ligue sur une saison donnee (ex: "LEC 2026")
- * ou un evenement international (ex: "MSI 2026").
+ * Une competition = un split d'une ligue sur une saison donnee (ex: "LEC 2026 Summer")
+ * ou un evenement ponctuel (ex: "MSI 2026", "IEM Season 7 Katowice"). Son format est
+ * decrit par ses phases (CompetitionStage).
  */
 @Entity
 @Table(name = "competition")
@@ -38,6 +40,21 @@ public class Competition {
 
     @Column(nullable = false)
     private Integer season;
+
+    /** Split de la saison, nul pour un evenement ponctuel. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private CompetitionSplit split;
+
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
+    /** Page d'origine d'un import (ex: "leaguepedia:EU LCS/Season 3/Spring Season"), nul si saisie a la main. */
+    @Column(name = "source_key", length = 255)
+    private String sourceKey;
 
     public Competition(String code, String name, CompetitionType type, String region, Integer season) {
         this.code = code;

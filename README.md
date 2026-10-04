@@ -105,7 +105,36 @@ Le fichier `V2__seed_data.sql` fourni a déjà été généré à partir de ton 
 - **19 lignes ignorées** : ce sont des créneaux de playoffs pas encore déterminés dans ton fichier (l'équipe qualifiée dépend d'un résultat pas encore joué). Normal, tu les ajouteras via l'appli une fois les équipes connues.
 - Si tu relances le script après avoir modifié l'Excel, régénère `V2__seed_data.sql` **avant** le tout premier démarrage (Flyway ne rejoue pas une migration déjà appliquée sur une base existante — si la base a déjà tourné, repars d'une base vide ou ajoute une `V3__...sql` avec seulement les nouveautés).
 
-## 8. Pistes d'évolution (hors v1)
+## 8. Historique des tournois (Leaguepedia)
+
+Les tournois depuis 2011 sont importés de [Leaguepedia](https://lol.fandom.com) (contenu sous licence CC BY-SA 3.0) par `import/import_leaguepedia.py`, à raison d'une migration Flyway par saison (`V17__leaguepedia_2011.sql` à `V31__leaguepedia_2025.sql`). Le périmètre couvre :
+
+- les ligues majeures (1re division de chaque région) et les événements internationaux officiels ;
+- les grands tournois hors Riot jusqu'en 2012 (IEM, IPL, MLG, DreamHack...) ;
+- mais pas les qualifications ni les promotions.
+
+Chaque tournoi est importé **avec sa structure mais sans les scores**, que tu saisis dans l'appli :
+
+- **Poules et saisons régulières** : toutes les rencontres sont présentes, équipes comprises. Les poules sont déduites de « qui a joué contre qui ».
+- **Playoffs** : le bracket est relié d'après les vrais vainqueurs, mais seules les équipes qui entrent dans le bracket sont placées. Les tours suivants se remplissent au fil des scores saisis.
+- **Équipes** : les renommages sont suivis jusqu'au nom actuel (SK Telecom T1 → T1, Samsung Galaxy → Gen.G…), et les anciens noms vont dans `team_name_history` (onglet « Historique du nom » de la fiche équipe). Une équipe déjà présente sous ce nom, ou sous le même code si elle existe encore, est réutilisée. Sinon, elle est créée avec son code court Leaguepedia, rendu unique si besoin. Les filiations que Leaguepedia ne trace pas (fusions, rachats) se déclarent dans `import/team_lineage.json`.
+
+```bash
+cd import
+pip install -r requirements.txt
+python import_leaguepedia.py preview 2013   # résumé lisible
+python import_leaguepedia.py sql 2013 > /tmp/leaguepedia_2013.sql
+```
+
+⚠️ Ces migrations sont déjà appliquées : ne les modifie pas (Flyway refuserait de démarrer, la somme de contrôle ne correspondant plus). Pour corriger ou compléter l'historique, génère une **nouvelle** migration (`V32__...`) qui ne contient que la différence.
+
+L'API de Leaguepedia limite fortement les requêtes anonymes : le script attend automatiquement et met tout en cache dans `import/cache/` (non versionné). Une interruption n'est donc pas grave, il reprend où il s'était arrêté.
+
+Les **logos** des équipes de l'historique sont chargés par `import/import_logos.py`, qui génère `V32__team_logos.sql`. Ce sont des miniatures WebP de 256 px venant de Leaguepedia. Seules les équipes **sans logo** sont complétées : un logo chargé à la main n'est jamais écrasé.
+
+Pour créer un tournoi à la main, utilise **Compétitions → Ajouter une compétition**, puis l'onglet **Format**. Chaque phase (poules aller simple ou aller-retour, ronde suisse, élimination simple ou double) génère ses matchs.
+
+## 9. Pistes d'évolution (hors v1)
 
 - Vrai arbre de bracket pour les playoffs (rounds liés entre eux, affichage graphique) plutôt qu'une liste de matchs avec `roundLabel` libre.
 - Import des feuilles MSI / Esports World Cup (format différent : groupes + bracket).
@@ -119,6 +148,6 @@ Le fichier `V2__seed_data.sql` fourni a déjà été généré à partir de ton 
 lol-results/
 ├── backend/    Spring Boot (Java 21, Maven, PostgreSQL, Flyway)
 ├── frontend/   Vue 3 + Vite
-├── import/     Script Python de conversion Excel → SQL
+├── import/     Scripts Python d'import (Excel, Leaguepedia) → migrations SQL
 └── README.md
 ```
