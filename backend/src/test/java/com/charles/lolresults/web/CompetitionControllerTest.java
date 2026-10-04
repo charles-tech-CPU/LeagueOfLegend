@@ -168,6 +168,15 @@ class CompetitionControllerTest {
     }
 
     @Test
+    void leServeurViteViaUneIpDuReseauEstAutoriseParCors() throws Exception {
+        mockMvc.perform(options("/api/competitions")
+                        .header("Origin", "http://192.168.1.20:5173")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://192.168.1.20:5173"));
+    }
+
+    @Test
     void uneAutreOrigineEstRefuseeParCors() throws Exception {
         mockMvc.perform(options("/api/competitions")
                         .header("Origin", "http://autre-site.example")
