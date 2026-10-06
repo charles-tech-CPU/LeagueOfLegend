@@ -1,5 +1,6 @@
 <template>
   <nav class="topbar">
+    <a :href="PORTAL_URL" class="portal-link" title="Retour au portail du foyer">← Portail</a>
     <router-link to="/" class="brand">
       <span class="brand-mark">LR</span>
       <span class="brand-text">LoL <span class="brand-accent">Results</span></span>
@@ -11,3 +12,7 @@
   </nav>
   <router-view />
 </template>
+
+<script setup>
+import { PORTAL_URL } from './portal'
+</script>

@@ -420,3 +420,28 @@ form.inline {
     font-size: 1.6em;
   }
 }
+
+/* Lien de retour au portail-foyer, tout a gauche de l'en-tete : discret mais visible */
+.portal-link {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-decoration: none;
+  color: var(--text-muted);
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.portal-link:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  text-decoration: none;
+}
+nav.topbar .portal-link {
+  margin-right: 6px;
+}
