@@ -21,6 +21,9 @@ Usage :
     python import_leaguepedia.py fetch 2013          # telecharge (lent, rejouable)
     python import_leaguepedia.py sql 2013 > ../backend/src/main/resources/db/migration/V16__leaguepedia_2013.sql
     python import_leaguepedia.py preview 2013        # resume lisible de ce qui sera genere
+
+Option --until AAAA-MM-JJ : seulement les competitions commencees au plus tard ce jour-la
+(saison en cours dont la suite est deja saisie autrement, ex: 2026 jusqu'au MSI).
 """
 import hashlib
 import json
@@ -41,7 +44,10 @@ CACHE = Path(__file__).parent / "cache"
 PARIS = ZoneInfo("Europe/Paris")
 
 SPLIT_WORDS = ("Winter", "Spring", "Summer")
-FIRST_YEAR, LAST_YEAR = 2011, 2025
+FIRST_YEAR, LAST_YEAR = 2011, 2026
+# Le cache "tournaments" historique couvre jusqu'a cette annee ; les suivantes ont
+# chacune leur cache, pour ne pas retelecharger (et changer) les saisons passees.
+LEGACY_LAST_YEAR = 2025
 
 # Codes courts des ligues et evenements (ceux de l'appli quand ils existent deja).
 LEAGUE_CODES = {
@@ -187,13 +193,18 @@ def chunks(values, size):
 # Selection et regroupement des tournois en competitions
 # ---------------------------------------------------------------------------
 
+TOURNAMENT_FIELDS = ("Name,OverviewPage,DateStart,Date,League,Region,Split,SplitNumber,Year,TournamentLevel,"
+                     "IsQualifier,IsPlayoffs,IsOfficial")
+
+
 def tournaments():
-    return cached("tournaments", lambda: cargo(
-        "Tournaments",
-        "Name,OverviewPage,DateStart,Date,League,Region,Split,SplitNumber,Year,TournamentLevel,"
-        "IsQualifier,IsPlayoffs,IsOfficial",
-        f"Year>={FIRST_YEAR} AND Year<={LAST_YEAR} AND TournamentLevel='Primary'",
-        "DateStart"))
+    rows = cached("tournaments", lambda: cargo(
+        "Tournaments", TOURNAMENT_FIELDS,
+        f"Year>={FIRST_YEAR} AND Year<={LEGACY_LAST_YEAR} AND TournamentLevel='Primary'", "DateStart"))
+    for year in range(LEGACY_LAST_YEAR + 1, LAST_YEAR + 1):
+        rows = rows + cached(f"tournaments_{year}", lambda year=year: cargo(
+            "Tournaments", TOURNAMENT_FIELDS, f"Year={year} AND TournamentLevel='Primary'", "DateStart"))
+    return rows
 
 
 def is_major_league(league):
@@ -240,9 +251,12 @@ def assign_splits(comps):
             # "Split 1/2/3", "Season 1/2", "Opening/Closing" : le numero prime sur l'ordre.
             three = max(n or 0 for n in numbers.values()) >= 3
             order = {1: "WINTER", 2: "SPRING", 3: "SUMMER"} if three else {1: "SPRING", 2: "SUMMER"}
+            first_numbered = min(c["pages"][0]["DateStart"] or "" for c in league_comps if numbers[c["id"]])
             for c in league_comps:
                 n = numbers[c["id"]]
                 c["split"] = order.get(n)  # sans numero (Post-Season, Placements...) : hors split
+                if n is None and not three and (c["pages"][0]["DateStart"] or "") < first_numbered:
+                    c["split"] = "WINTER"  # coupe d'avant le Split 1 (ex: CBLOL Cup 2026)
             continue
         if len(league_comps) == 3:
             names = ["WINTER", "SPRING", "SUMMER"]
@@ -668,8 +682,10 @@ def kickoff(m, fallback):
     return paris.date().isoformat(), paris.strftime("%H:%M:00")
 
 
-def generate(year):
+def generate(year, until=None):
     comps = competitions_of(year)
+    if until:
+        comps = [c for c in comps if (c["pages"][0]["DateStart"] or "") <= until]
     pages = [p["OverviewPage"] for c in comps for p in c["pages"]]
     matches = matches_of(year, pages)
     by_page = defaultdict(list)
@@ -687,8 +703,8 @@ def stage_rows(stage):
     return [m for g in stage["groups"] for m in g] + stage["tiebreak"]
 
 
-def emit_sql(year):
-    built, teams = generate(year)
+def emit_sql(year, until=None):
+    built, teams = generate(year, until)
     out = []
     w = out.append
     w(f"-- Historique {year} importe de Leaguepedia (https://lol.fandom.com, CC BY-SA 3.0) par")
@@ -816,8 +832,8 @@ def emit_match(w, comp, stage, group_id, label, m, fallback, phase, side, t1, t2
 # Ligne de commande
 # ---------------------------------------------------------------------------
 
-def preview(year):
-    built, teams = generate(year)
+def preview(year, until=None):
+    built, teams = generate(year, until)
     print(f"Saison {year} : {len(built)} competitions, {len(teams)} equipes")
     for c in built:
         print(f"\n{c['name']}  [{c['code']} | {c['type']} | {c['region']} | split={c['split']}] {c['start']} -> {c['end']}")
@@ -835,18 +851,23 @@ def preview(year):
 
 
 def main():
-    if len(sys.argv) != 3 or sys.argv[1] not in ("fetch", "sql", "preview"):
+    args = sys.argv[1:]
+    until = None
+    if len(args) == 4 and args[2] == "--until" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", args[3]):
+        until = args[3]
+        args = args[:2]
+    if len(args) != 2 or args[0] not in ("fetch", "sql", "preview"):
         print(__doc__, file=sys.stderr)
         sys.exit(1)
-    command, year = sys.argv[1], int(sys.argv[2])
+    command, year = args[0], int(args[1])
     if command == "fetch":
-        built, teams = generate(year)
+        built, teams = generate(year, until)
         print(f"{year} : {len(built)} competitions et {len(teams)} equipes en cache", file=sys.stderr)
     elif command == "preview":
-        preview(year)
+        preview(year, until)
     else:
         sys.stdout.reconfigure(encoding="utf-8")
-        sys.stdout.write(emit_sql(year))
+        sys.stdout.write(emit_sql(year, until))
 
 
 if __name__ == "__main__":
