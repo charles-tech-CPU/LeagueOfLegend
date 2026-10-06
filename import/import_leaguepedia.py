@@ -717,26 +717,9 @@ def emit_sql(year, until=None):
     w("")
     w("-- Equipe actuelle (apres renommages) : existante de meme nom, ou de meme code si elle")
     w("-- existe encore aujourd'hui ; sinon creee (code rendu unique si deja pris).")
-    w("CREATE FUNCTION pg_temp.lp_team(p_name TEXT, p_code TEXT, p_region TEXT, p_active BOOLEAN) RETURNS BIGINT AS $$")
-    w("DECLARE v_id BIGINT; v_code TEXT := p_code; n INT := 1;")
-    w("BEGIN")
-    w("    SELECT id INTO v_id FROM team WHERE lower(name) = lower(p_name) ORDER BY id LIMIT 1;")
-    w("    IF v_id IS NULL AND p_active THEN")
-    w("        SELECT id INTO v_id FROM team WHERE code = p_code ORDER BY id LIMIT 1;")
-    w("    END IF;")
-    w("    IF v_id IS NOT NULL THEN RETURN v_id; END IF;")
-    w("    WHILE EXISTS (SELECT 1 FROM team WHERE code = v_code) LOOP")
-    w("        n := n + 1;")
-    w("        v_code := left(p_code, 18) || n;")
-    w("    END LOOP;")
-    w("    INSERT INTO team (code, name, region) VALUES (v_code, p_name, p_region) RETURNING id INTO v_id;")
-    w("    RETURN v_id;")
-    w("END $$ LANGUAGE plpgsql;")
-    w("")
+    w("-- En SQL simple, sans PL/pgSQL (plpgsql.dll peut etre bloquee sur un poste Windows).")
     for name in sorted(teams):
-        t = teams[name]
-        w(f"INSERT INTO lp_team VALUES ({sql(name)}, pg_temp.lp_team({sql(t['name'][:100])}, {sql(team_code(t))}, "
-          f"{sql((t['region'] or None) and t['region'][:50])}, {'TRUE' if t['active'] else 'FALSE'}));")
+        emit_team(w, name, teams[name])
     w("")
     w("-- Historique des noms (ex: SK Telecom T1 K -> SK Telecom T1 -> T1).")
     done = set()
@@ -761,10 +744,24 @@ def emit_sql(year, until=None):
             stage = f"(SELECT id FROM competition_stage WHERE competition_id = {comp} AND position = {pos})"
             emit_stage(w, c, s, pos, comp, stage, teams)
     w("")
-    w("DROP FUNCTION pg_temp.lp_team(TEXT, TEXT, TEXT, BOOLEAN);")
     w("DROP TABLE lp_match;")
     w("DROP TABLE lp_team;")
     return "\n".join(out) + "\n"
+
+
+def emit_team(w, lp_name, t):
+    name, code = sql(t["name"][:100]), team_code(t)
+    region = sql((t["region"] or None) and t["region"][:50])
+    missing = f"NOT EXISTS (SELECT 1 FROM lp_team WHERE lp_name = {sql(lp_name)})"
+    w(f"INSERT INTO lp_team SELECT {sql(lp_name)}, id FROM team WHERE lower(name) = lower({name}) ORDER BY id LIMIT 1;")
+    if t["active"]:
+        w(f"INSERT INTO lp_team SELECT {sql(lp_name)}, id FROM team WHERE code = {sql(code)} AND {missing} "
+          f"ORDER BY id LIMIT 1;")
+    free_code = (f"(SELECT c FROM (SELECT {sql(code)} AS c, 1 AS n UNION ALL SELECT {sql(code[:18])} || n, n "
+                 f"FROM generate_series(2, 99) n) x WHERE NOT EXISTS (SELECT 1 FROM team WHERE code = x.c) "
+                 f"ORDER BY n LIMIT 1)")
+    w(f"WITH created AS (INSERT INTO team (code, name, region) SELECT {free_code}, {name}, {region} WHERE {missing} "
+      f"RETURNING id) INSERT INTO lp_team SELECT {sql(lp_name)}, id FROM created;")
 
 
 def emit_stage(w, c, s, pos, comp, stage, teams):
