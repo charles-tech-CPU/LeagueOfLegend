@@ -123,6 +123,10 @@ export function winnerSlot(m) {
   return m.score1 > m.score2 ? 1 : 2
 }
 
+function byText(a, b) {
+  return a.localeCompare(b)
+}
+
 function byKickoff(a, b) {
   return kickoff(a).localeCompare(kickoff(b)) || a.roundLabel.localeCompare(b.roundLabel, undefined, { numeric: true })
 }
@@ -182,7 +186,7 @@ function laneColumns(laneMatches) {
   }
   const rounds = [...byRound.entries()].map(([label, ms]) => ({
     labels: [label],
-    start: ms.map(kickoff).sort()[0],
+    start: ms.map(kickoff).sort(byText)[0],
     matches: ms
   })).sort((a, b) => a.start.localeCompare(b.start))
 
@@ -228,7 +232,7 @@ function orderColumnsByLinks(columns, winnerIdsInto) {
     const ms = byCol.get(ci)
     return {
       labels: [...new Set(ms.map(m => roundColumn(m.roundLabel)))],
-      start: ms.map(kickoff).sort()[0],
+      start: ms.map(kickoff).sort(byText)[0],
       matches: ms
     }
   })
@@ -319,6 +323,45 @@ function orderSides(sides, winners, matches) {
   return ordered
 }
 
+/**
+ * Colonne de chaque round d'un cote. Un cote qui en prolonge un autre (ex: grande
+ * finale, bracket haut apres des rounds communs) se place a droite des matchs qui
+ * l'alimentent : chaque colonne (et les suivantes) se decale si un de ses matchs recoit
+ * le vainqueur d'un match deja place plus a droite dans un autre cote.
+ */
+function placeLaneColumns(columns, winnerIdsInto, colOf, mixedRound) {
+  const colIndex = []
+  let fedFromOtherSide = false
+  columns.forEach((c, ci) => {
+    const feederCols = c.matches.flatMap(m => (winnerIdsInto.get(m.id) ?? []).filter(f => colOf.has(f)).map(f => colOf.get(f)))
+    if (ci === 0) fedFromOtherSide = feederCols.length > 0
+    const previous = ci > 0 ? colIndex[ci - 1] + 1 : 0
+    colIndex.push(Math.max(previous, ...feederCols.map(col => col + 1)))
+    for (const m of c.matches) {
+      colOf.set(m.id, colIndex[ci])
+      if (c.labels.length > 1) mixedRound.add(m.id)
+    }
+  })
+  return { colIndex, fedFromOtherSide }
+}
+
+/** Finale placee a hauteur de ses demi-finales, sans chevaucher une carte de sa colonne. */
+function placeFloatingFinal(matchesOf, x, winnerIdsInto, pos) {
+  const step = CARD_H + ROW_GAP
+  let minY = 0
+  for (const m of matchesOf) {
+    const feeders = (winnerIdsInto.get(m.id) ?? []).filter(id => pos.has(id))
+    const cy = mean(feeders.map(id => pos.get(id).y + CARD_H / 2))
+    let y = Math.max(cy - CARD_H / 2, minY)
+    const sameColumn = [...pos.values()].filter(p => p.x === x).sort((a, b) => a.y - b.y)
+    for (const p of sameColumn) {
+      if (y < p.y + step && y + step > p.y) y = p.y + step
+    }
+    pos.set(m.id, { x, y })
+    minY = y + step
+  }
+}
+
 function buildTreeBoard(key, label, matches, geometry) {
   const { cardW, colGap } = geometry
   const colX = col => col * (cardW + colGap)
@@ -345,22 +388,7 @@ function buildTreeBoard(key, label, matches, geometry) {
     const columns = orderColumnsByLinks(laneColumns(laneMatches), winnerIdsInto)
     for (const c of columns) c.labels = c.labels.map(l => shortRound(l, prefixes.get(side)))
 
-    // Un cote qui prolonge un autre (ex: grande finale, bracket haut apres des
-    // rounds communs) se place a droite des matchs qui l'alimentent : chaque colonne
-    // (et les suivantes) se decale si un de ses matchs recoit le vainqueur d'un match
-    // deja place plus a droite dans un autre cote.
-    const colIndex = []
-    let fedFromOtherSide = false
-    columns.forEach((c, ci) => {
-      const feederCols = c.matches.flatMap(m => (winnerIdsInto.get(m.id) ?? []).filter(f => colOf.has(f)).map(f => colOf.get(f)))
-      if (ci === 0) fedFromOtherSide = feederCols.length > 0
-      const previous = ci > 0 ? colIndex[ci - 1] + 1 : 0
-      colIndex.push(Math.max(previous, ...feederCols.map(col => col + 1)))
-      c.matches.forEach(m => {
-        colOf.set(m.id, colIndex[ci])
-        if (c.labels.length > 1) mixedRound.add(m.id)
-      })
-    })
+    const { colIndex, fedFromOtherSide } = placeLaneColumns(columns, winnerIdsInto, colOf, mixedRound)
     const offset = colIndex[0]
     maxCol = Math.max(maxCol, colIndex.at(-1))
 
@@ -393,20 +421,7 @@ function buildTreeBoard(key, label, matches, geometry) {
 
   for (const f of floating) {
     const matchesOf = f.columns[0].matches
-    let minY = 0
-    for (const m of matchesOf) {
-      const feeders = (winnerIdsInto.get(m.id) ?? []).filter(id => pos.has(id))
-      const cy = mean(feeders.map(id => pos.get(id).y + CARD_H / 2))
-      let y = Math.max(cy - CARD_H / 2, minY)
-      // Sans chevaucher une carte deja placee dans la meme colonne
-      const x = colX(f.offset)
-      const sameColumn = [...pos.values()].filter(p => p.x === x).sort((a, b) => a.y - b.y)
-      for (const p of sameColumn) {
-        if (y < p.y + CARD_H + ROW_GAP && y + CARD_H + ROW_GAP > p.y) y = p.y + CARD_H + ROW_GAP
-      }
-      pos.set(m.id, { x, y })
-      minY = y + CARD_H + ROW_GAP
-    }
+    placeFloatingFinal(matchesOf, colX(f.offset), winnerIdsInto, pos)
     lanes.push({
       key: f.side,
       label: sideLabel(f.side),
@@ -455,29 +470,41 @@ function championOf(matches) {
  * sur les visuels officiels des Worlds. Un bilan est inconnu ("?") tant qu'un
  * match precedent de l'equipe n'a pas de resultat.
  */
+const NO_RECORD = { w: 0, l: 0, unknown: false }
+
+/** Bilan d'une equipe avant son match ("2-1"), "?" si inconnu ou equipe pas encore connue. */
+function recordBefore(records, teamId) {
+  if (teamId == null) return '?'
+  const r = records.get(teamId) ?? NO_RECORD
+  return r.unknown ? '?' : `${r.w}-${r.l}`
+}
+
+/** Met a jour le bilan des deux equipes ; un match sans resultat rend leur bilan inconnu. */
+function recordResult(records, m) {
+  const slot = winnerSlot(m)
+  for (const [teamId, teamSlot] of [[m.team1Id, 1], [m.team2Id, 2]]) {
+    if (teamId == null) continue
+    const before = records.get(teamId) ?? NO_RECORD
+    let after = { ...before, l: before.l + 1 }
+    if (!slot) after = { ...before, unknown: true }
+    else if (slot === teamSlot) after = { ...before, w: before.w + 1 }
+    records.set(teamId, after)
+  }
+}
+
 function buildSwissBoard(key, matches) {
   const sorted = [...matches].sort(byKickoff)
   const roundOf = swissRounds(sorted)
-  const record = new Map()
-  const rec = id => record.get(id) ?? { w: 0, l: 0, unknown: false }
+  const records = new Map()
   const rounds = new Map()
   for (const m of sorted) {
     const round = roundOf.get(m.id)
     if (!rounds.has(round)) rounds.set(round, new Map())
-    const r = m.team1Id != null ? rec(m.team1Id) : null
-    const bucket = r && !r.unknown ? `${r.w}-${r.l}` : '?'
     const buckets = rounds.get(round)
+    const bucket = recordBefore(records, m.team1Id)
     if (!buckets.has(bucket)) buckets.set(bucket, [])
     buckets.get(bucket).push(m)
-
-    const slot = winnerSlot(m)
-    for (const [teamId, teamSlot] of [[m.team1Id, 1], [m.team2Id, 2]]) {
-      if (teamId == null) continue
-      const before = rec(teamId)
-      if (!slot) record.set(teamId, { ...before, unknown: true })
-      else if (slot === teamSlot) record.set(teamId, { ...before, w: before.w + 1 })
-      else record.set(teamId, { ...before, l: before.l + 1 })
-    }
+    recordResult(records, m)
   }
   const columns = [...rounds.entries()].map(([label, buckets]) => ({
     label,
@@ -539,9 +566,9 @@ export function buildBoards(matches, avail = 0) {
   const multiStage = stageIds.size > 1
   const boardGroups = groupBy(matches, m => `${multiStage ? m.stageId ?? '' : ''}#${boardOf(m)}`)
   const firstSide = key => [...new Set(boardGroups.get(key).map(m => m.bracketSide || 'AUTRE'))].sort(compareSides)[0]
-  const firstKickoff = key => boardGroups.get(key).map(kickoff).sort()[0]
+  const firstKickoff = key => boardGroups.get(key).map(kickoff).sort(byText)[0]
   const stageOf = key => key.slice(0, key.indexOf('#'))
-  const stageStart = key => [...boardGroups.keys()].filter(k => stageOf(k) === stageOf(key)).map(firstKickoff).sort()[0]
+  const stageStart = key => [...boardGroups.keys()].filter(k => stageOf(k) === stageOf(key)).map(firstKickoff).sort(byText)[0]
   const keys = [...boardGroups.keys()].sort((a, b) =>
     stageStart(a).localeCompare(stageStart(b)) || compareSides(firstSide(a), firstSide(b)))
 
@@ -564,7 +591,7 @@ export function buildBoards(matches, avail = 0) {
   const sameLabel = groupBy(boards, b => b.label)
   for (const b of boards) {
     if (sameLabel.get(b.label).length < 2) continue
-    const days = boardGroups.get(b.key).map(m => m.date).sort()
+    const days = boardGroups.get(b.key).map(m => m.date).sort(byText)
     const day = iso => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
     b.label = days[0] === days.at(-1) ? `${b.label} (${day(days[0])})` : `${b.label} (${day(days[0])} → ${day(days.at(-1))})`
   }

@@ -218,8 +218,9 @@ function rosterOf(teamId) {
 
 function option(playerId) {
   const p = playersById.value.get(playerId)
-  const team = sides.value.find(s => s.teamId === p?.teamOfMatch)
-  return { id: playerId, label: p ? `${p.pseudo}${team ? ` (${team.code})` : ''}` : `#${playerId}` }
+  if (!p) return { id: playerId, label: `#${playerId}` }
+  const team = sides.value.find(s => s.teamId === p.teamOfMatch)
+  return { id: playerId, label: team ? `${p.pseudo} (${team.code})` : p.pseudo }
 }
 
 function selectedPlayers(game) {
@@ -299,36 +300,38 @@ function addSavedPlayers(details) {
   }
 }
 
-function toPayload() {
-  const payloadGames = []
-  for (const g of games.value) {
-    const players = []
-    for (const side of sides.value) {
-      for (const pos of POSITIONS) {
-        const line = g.lines[side.teamId][pos.key]
-        const champion = line.champion.trim()
-        const hasStats = STATS.some(s => !isBlank(line[s]))
-        if (!champion) {
-          if (hasStats) throw new Error(`Game ${g.gameNumber} : champion manquant pour ${side.code} ${pos.key}`)
-          continue
-        }
-        const official = championName(champion)
-        if (!official) throw new Error(`Game ${g.gameNumber} : champion inconnu « ${champion} »`)
-        if (line.playerId == null) throw new Error(`Game ${g.gameNumber} : joueur manquant pour ${side.code} ${pos.key}`)
-        players.push({
-          playerId: line.playerId,
-          teamId: side.teamId,
-          position: pos.key,
-          champion: official,
-          ...Object.fromEntries(STATS.map(s => [s, isBlank(line[s]) ? null : line[s]]))
-        })
-      }
-    }
-    if (g.winnerTeamId != null || g.mvpPlayerId != null || players.length) {
-      payloadGames.push({ gameNumber: g.gameNumber, winnerTeamId: g.winnerTeamId, mvpPlayerId: g.mvpPlayerId, players })
-    }
+/** Ligne d'un poste prete a envoyer, null si vide ; leve une erreur si elle est incomplete. */
+function linePayload(g, side, pos) {
+  const line = g.lines[side.teamId][pos.key]
+  const champion = line.champion.trim()
+  const where = `Game ${g.gameNumber} : `
+  if (!champion) {
+    if (STATS.some(s => !isBlank(line[s]))) throw new Error(`${where}champion manquant pour ${side.code} ${pos.key}`)
+    return null
   }
-  return { mvpPlayerId: seriesMvp.value, games: payloadGames }
+  const official = championName(champion)
+  if (!official) throw new Error(`${where}champion inconnu « ${champion} »`)
+  if (line.playerId == null) throw new Error(`${where}joueur manquant pour ${side.code} ${pos.key}`)
+  return {
+    playerId: line.playerId,
+    teamId: side.teamId,
+    position: pos.key,
+    champion: official,
+    ...Object.fromEntries(STATS.map(s => [s, isBlank(line[s]) ? null : line[s]]))
+  }
+}
+
+function toPayload() {
+  const payloadGames = games.value.map(g => {
+    const players = sides.value
+      .flatMap(side => POSITIONS.map(pos => linePayload(g, side, pos)))
+      .filter(line => line != null)
+    return { gameNumber: g.gameNumber, winnerTeamId: g.winnerTeamId, mvpPlayerId: g.mvpPlayerId, players }
+  })
+  return {
+    mvpPlayerId: seriesMvp.value,
+    games: payloadGames.filter(g => g.winnerTeamId != null || g.mvpPlayerId != null || g.players.length)
+  }
 }
 
 async function save() {

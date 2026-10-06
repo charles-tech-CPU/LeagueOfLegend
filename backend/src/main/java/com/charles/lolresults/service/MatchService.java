@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class MatchService {
 
+    private static final String MATCH_NOT_FOUND = "Match introuvable : ";
+
     private final MatchRepository matchRepository;
     private final CompetitionRepository competitionRepository;
     private final CompetitionGroupRepository groupRepository;
@@ -63,9 +65,8 @@ public class MatchService {
 
     @Transactional(readOnly = true)
     public MatchDto findOne(Long id) {
-        return MatchDto.from(matchRepository
-                .findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Match introuvable : " + id)));
+        return MatchDto.from(
+                matchRepository.findById(id).orElseThrow(() -> new EntityNotFoundException(MATCH_NOT_FOUND + id)));
     }
 
     public MatchDto create(MatchCreateDto dto) {
@@ -77,9 +78,7 @@ public class MatchService {
     }
 
     public MatchDto update(Long id, MatchCreateDto dto) {
-        Match match = matchRepository
-                .findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Match introuvable : " + id));
+        Match match = matchRepository.findById(id).orElseThrow(() -> new EntityNotFoundException(MATCH_NOT_FOUND + id));
         applyFields(match, dto);
         Match saved = matchRepository.save(match);
         propagateAdvancement(saved);
@@ -139,7 +138,7 @@ public class MatchService {
         }
         return matchRepository
                 .findById(matchId)
-                .orElseThrow(() -> new EntityNotFoundException("Match introuvable : " + matchId));
+                .orElseThrow(() -> new EntityNotFoundException(MATCH_NOT_FOUND + matchId));
     }
 
     /**
