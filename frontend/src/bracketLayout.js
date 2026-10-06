@@ -9,6 +9,23 @@ export const COL_GAP = 64
 export const ROW_GAP = 18
 export const LANE_HEAD = 56
 export const LANE_GAP = 40
+// En dessous, la carte n'affiche plus que le code des equipes (voir BracketMatchCard)
+export const MIN_CARD_W = 150
+const MIN_COL_GAP = 28
+
+/**
+ * Largeur des cartes et ecart entre colonnes pour que `cols` colonnes tiennent
+ * dans `avail` px : on reduit les deux dans la meme proportion, sans descendre
+ * sous les minimums (au-dela, le tableau defile horizontalement).
+ */
+export function fitGeometry(cols, avail) {
+  const full = cols * CARD_W + (cols - 1) * COL_GAP
+  const ratio = avail > 0 ? Math.min(1, avail / full) : 1
+  const cardW = Math.max(MIN_CARD_W, Math.floor(CARD_W * ratio))
+  // Cartes au minimum : l'ecart prend ce qui reste plutot que de deborder
+  const leftover = cols > 1 ? Math.floor((avail - cols * cardW) / (cols - 1)) : COL_GAP
+  return { cardW, colGap: Math.max(MIN_COL_GAP, Math.min(Math.floor(COL_GAP * ratio), leftover)) }
+}
 
 const SIDE_LABELS = {
   GROUP: 'Poules',
@@ -226,8 +243,8 @@ function groupBy(list, keyOf) {
   return map
 }
 
-function edgePath(a, b) {
-  const x1 = a.x + CARD_W
+function edgePath(a, b, cardW) {
+  const x1 = a.x + cardW
   const y1 = a.y + CARD_H / 2
   const x2 = b.x
   const y2 = b.y + CARD_H / 2
@@ -238,7 +255,9 @@ function edgePath(a, b) {
   return `M${x1},${y1} H${midX - r} Q${midX},${y1} ${midX},${y1 + dir * r} V${y2 - dir * r} Q${midX},${y2} ${midX + r},${y2} H${x2}`
 }
 
-function buildTreeBoard(key, label, matches) {
+function buildTreeBoard(key, label, matches, geometry) {
+  const { cardW, colGap } = geometry
+  const colX = col => col * (cardW + colGap)
   const prefixes = roundPrefixes(matches)
   const winners = winnerLinks(matches)
   const losers = loserLinks(matches)
@@ -284,7 +303,7 @@ function buildTreeBoard(key, label, matches) {
     let bottom = bodyTop
     for (const [id, cy] of centerY) {
       const y = bodyTop + cy - CARD_H / 2
-      pos.set(id, { x: colOf.get(id) * (CARD_W + COL_GAP), y })
+      pos.set(id, { x: colX(colOf.get(id)), y })
       bottom = Math.max(bottom, y + CARD_H)
     }
     lanes.push({
@@ -292,8 +311,8 @@ function buildTreeBoard(key, label, matches) {
       label: sideLabel(side),
       top: laneTop,
       height: bottom - laneTop,
-      width: (offset + columns.length) * (CARD_W + COL_GAP) - COL_GAP,
-      columns: columns.map((c, ci) => ({ x: (offset + ci) * (CARD_W + COL_GAP), labels: c.labels, date: c.start.slice(0, 10) }))
+      width: colX(offset + columns.length) - colGap,
+      columns: columns.map((c, ci) => ({ x: colX(offset + ci), labels: c.labels, date: c.start.slice(0, 10) }))
     })
     laneTop = bottom + LANE_GAP
   }
@@ -305,7 +324,7 @@ function buildTreeBoard(key, label, matches) {
       const feeders = (winnerIdsInto.get(m.id) ?? []).filter(id => pos.has(id))
       const cy = mean(feeders.map(id => pos.get(id).y + CARD_H / 2))
       const y = Math.max(cy - CARD_H / 2, minY)
-      pos.set(m.id, { x: f.offset * (CARD_W + COL_GAP), y })
+      pos.set(m.id, { x: colX(f.offset), y })
       minY = y + CARD_H + ROW_GAP
     }
     lanes.push({
@@ -314,7 +333,7 @@ function buildTreeBoard(key, label, matches) {
       floating: true,
       top: Math.min(...matchesOf.map(m => pos.get(m.id).y)) - LANE_HEAD,
       height: 0,
-      columns: [{ x: f.offset * (CARD_W + COL_GAP), labels: f.columns[0].labels, date: f.columns[0].start.slice(0, 10) }]
+      columns: [{ x: colX(f.offset), labels: f.columns[0].labels, date: f.columns[0].start.slice(0, 10) }]
     })
   }
 
@@ -329,16 +348,16 @@ function buildTreeBoard(key, label, matches) {
     const slot = winnerSlot(from)
     return {
       id: `${l.from}-${l.to}`,
-      d: edgePath(pos.get(l.from), pos.get(l.to)),
+      d: edgePath(pos.get(l.from), pos.get(l.to), cardW),
       done: slot != null,
       teamId: teamIdAt(from, slot)
     }
   })
 
-  const width = (maxCol + 1) * CARD_W + maxCol * COL_GAP
+  const width = colX(maxCol + 1) - colGap
   const height = Math.max(...nodes.map(n => n.y + CARD_H), 0)
   if (lanes.length === 1) lanes[0].hideTitle = true
-  return { kind: 'tree', key, label, nodes, edges, lanes, width, height, champion: championOf(matches) }
+  return { kind: 'tree', key, label, nodes, edges, lanes, width, height, cols: maxCol + 1, cardW, champion: championOf(matches) }
 }
 
 function championOf(matches) {
@@ -390,8 +409,11 @@ function bucketRank(r) {
   return l - w
 }
 
-/** Tous les tableaux a afficher, dans l'ordre de la competition. */
-export function buildBoards(matches) {
+/**
+ * Tous les tableaux a afficher, dans l'ordre de la competition. `avail` est la
+ * largeur disponible en px : les arbres sont resserres pour y tenir.
+ */
+export function buildBoards(matches, avail = 0) {
   const boardGroups = groupBy(matches, m => {
     const side = m.bracketSide || 'AUTRE'
     return BOARD_OF_SIDE[side] ?? side
@@ -402,7 +424,11 @@ export function buildBoards(matches) {
   return keys.map(key => {
     const ms = boardGroups.get(key)
     if (key === 'SWISS_STAGE') return buildSwissBoard(key, ms)
-    return buildTreeBoard(key, BOARD_LABELS[key] ?? sideLabel(key), ms)
+    const label = BOARD_LABELS[key] ?? sideLabel(key)
+    // Le nombre de colonnes n'est connu qu'apres une premiere mise en page
+    const natural = buildTreeBoard(key, label, ms, { cardW: CARD_W, colGap: COL_GAP })
+    if (natural.width <= avail || !avail) return natural
+    return buildTreeBoard(key, label, ms, fitGeometry(natural.cols, avail))
   })
 }
 

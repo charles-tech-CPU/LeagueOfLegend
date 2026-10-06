@@ -17,7 +17,7 @@
     </div>
   </div>
 
-  <div class="table-scroll">
+  <div class="table-scroll full-bleed">
     <table v-if="sortedMatches.length">
       <thead>
         <tr>

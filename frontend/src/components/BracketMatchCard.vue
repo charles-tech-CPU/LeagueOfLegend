@@ -1,7 +1,7 @@
 <template>
   <article
     class="match-card"
-    :class="{ done: winner != null, today: isToday, dimmed: highlight != null && !involves(highlight), focus: highlight != null && involves(highlight) }"
+    :class="{ compact: width != null && width < COMPACT_W, done: winner != null, today: isToday, dimmed: highlight != null && !involves(highlight), focus: highlight != null && involves(highlight) }"
     :style="width ? { width: `${width}px`, height: `${height}px` } : null"
   >
     <header class="card-head">
@@ -57,6 +57,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['hover'])
+
+// Carte resserree (bracket large) : le code de l'equipe suffit
+const COMPACT_W = 190
 
 const winner = computed(() => winnerSlot(props.match))
 const time = computed(() => formatTime(props.match.time))
@@ -222,6 +225,19 @@ function involves(id) {
   color: var(--text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.compact .full {
+  display: none;
+}
+.compact .team-row {
+  gap: 7px;
+  padding-left: 8px;
+}
+.compact .card-head {
+  padding: 0 8px;
+}
+.compact .score {
+  width: 32px;
 }
 .winner .code {
   color: var(--gold-bright);

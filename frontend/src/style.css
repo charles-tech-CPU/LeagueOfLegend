@@ -26,6 +26,7 @@
   --radius-sm: 9px;
   --shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.7);
   --glow: 0 0 0 1px rgba(34, 211, 238, 0.35), 0 8px 28px -8px rgba(34, 211, 238, 0.35);
+  --gutter: 20px;
 }
 
 * {
@@ -52,7 +53,7 @@ body {
 #app {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 0 20px 64px;
+  padding: 0 var(--gutter) 64px;
 }
 
 h1, h2, h3, h4 {
@@ -105,8 +106,8 @@ nav.topbar {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0 -20px;
-  padding: 12px 20px;
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 12px var(--gutter);
   background: rgba(8, 10, 20, 0.72);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -374,18 +375,19 @@ form.inline {
   color: var(--accent);
 }
 
-/* Tableau de matchs editables : sort du conteneur centre (#app) pour utiliser
-   toute la largeur de la fenetre, car il a trop de colonnes pour tenir dans
-   une largeur de contenu classique. */
+/* Bloc pleine largeur : sort du conteneur centre (#app) pour utiliser toute
+   la largeur de la fenetre (tableaux a nombreuses colonnes, brackets). */
+.full-bleed {
+  width: var(--page-w, 100vw);
+  margin-left: calc(50% - var(--page-w, 100vw) / 2);
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+/* Tableau de matchs editables : trop de colonnes pour la largeur de contenu
+   classique, il passe en pleine largeur et ne defile qu'en dernier recours. */
 .table-scroll {
   overflow-x: auto;
-  width: 100vw;
-  position: relative;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
-  padding: 0 20px;
 }
 
 .table-scroll table {
@@ -396,17 +398,20 @@ form.inline {
 
 .table-scroll th,
 .table-scroll td {
-  padding: 10px 10px;
+  padding: 10px 8px;
   font-size: 0.95em;
 }
 
 @media (max-width: 640px) {
+  :root {
+    --gutter: 16px;
+  }
   #app {
-    padding: 0 16px 48px;
+    padding-bottom: 48px;
   }
   nav.topbar {
-    margin: 0 -16px;
-    padding: 10px 16px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
   .brand-text {
     display: none;

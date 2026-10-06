@@ -1,5 +1,6 @@
 <template>
-  <table v-if="rows.length" class="standings">
+  <div v-if="rows.length" class="standings-wrap">
+  <table class="standings">
     <thead>
       <tr>
         <th class="rank-col">#</th>
@@ -22,6 +23,7 @@
               <span v-else>{{ (row.teamCode ?? '').slice(0, 2) }}</span>
             </span>
             <span class="team-name">{{ row.teamName }}</span>
+            <span class="team-code" :title="row.teamName">{{ row.teamCode }}</span>
           </span>
         </td>
         <td class="num record">
@@ -51,6 +53,7 @@
       </tr>
     </tbody>
   </table>
+  </div>
   <p v-else class="muted">Aucun match de saison régulière joué pour l'instant : le classement apparaîtra dès qu'un résultat sera enregistré.</p>
 </template>
 
@@ -115,6 +118,12 @@ function diffTone(row) {
 </script>
 
 <style scoped>
+/* Le tableau s'adapte a la largeur de son panneau (deux poules cote a cote,
+   mobile...) et ne defile qu'en dernier recours. */
+.standings-wrap {
+  container-type: inline-size;
+  overflow-x: auto;
+}
 .standings td {
   padding-top: 9px;
   padding-bottom: 9px;
@@ -175,6 +184,10 @@ function diffTone(row) {
 }
 .team-name {
   font-weight: 700;
+}
+.team-code {
+  display: none;
+  font-weight: 800;
 }
 .record {
   font-family: "Outfit", sans-serif;
@@ -266,9 +279,41 @@ function diffTone(row) {
   color: #fff;
   background: #be123c;
 }
-@media (max-width: 720px) {
+@container (max-width: 680px) {
+  .standings th,
+  .standings td {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .rank-col {
+    width: 40px;
+  }
+  .team {
+    gap: 9px;
+  }
+  .rate-col {
+    width: auto;
+  }
+  .rate-bar {
+    display: none;
+  }
+}
+@container (max-width: 460px) {
   .rate-col {
     display: none;
+  }
+  .team-name {
+    display: none;
+  }
+  .team-code {
+    display: inline;
+  }
+  .pip {
+    width: 17px;
+    height: 17px;
+  }
+  .form {
+    gap: 3px;
   }
 }
 </style>

@@ -66,13 +66,6 @@ function cellClass(row, col) {
 <style scoped>
 .h2h-scroll {
   overflow-x: auto;
-  width: 100vw;
-  position: relative;
-  left: 50%;
-  right: 50%;
-  margin-left: -50vw;
-  margin-right: -50vw;
-  padding: 0 16px;
 }
 .h2h-table {
   border-collapse: collapse;
@@ -84,7 +77,7 @@ function cellClass(row, col) {
 .h2h-table td {
   border: 1px solid var(--border);
   text-align: center;
-  padding: 7px 9px;
+  padding: 6px 7px;
   font-size: 0.84em;
 }
 .corner {
@@ -135,7 +128,7 @@ function cellClass(row, col) {
   flex-shrink: 0;
 }
 .cell {
-  min-width: 46px;
+  min-width: 42px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);

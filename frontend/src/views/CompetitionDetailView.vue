@@ -62,7 +62,7 @@
     <div v-for="g in groupedData" :key="g.id ?? 'all'" class="group-block">
       <h3 v-if="g.name">{{ g.name }}</h3>
       <div class="group-panels">
-        <div v-for="(legCells, legIndex) in g.legs" :key="legIndex" class="group-panel">
+        <div v-for="(legCells, legIndex) in g.legs" :key="legIndex" class="group-panel h2h-panel">
           <h4 v-if="g.legs.length > 1">{{ legLabel(legIndex) }}</h4>
           <HeadToHeadTable :rows="g.standings" :cells="legCells" />
         </div>
@@ -83,7 +83,7 @@
   </section>
 
   <section v-if="activeTab === 'calendar'" class="tab-panel">
-    <div class="table-scroll">
+    <div class="table-scroll full-bleed">
     <table v-if="sortedMatches.length">
       <thead>
         <tr>
@@ -605,6 +605,11 @@ onMounted(initialLoad)
 .group-panel {
   flex: 1 1 460px;
   min-width: 0;
+}
+/* Matrice : prend la largeur de son contenu, et passe a la ligne plutot que
+   de defiler quand deux ne tiennent pas cote a cote. */
+.h2h-panel {
+  flex-basis: auto;
 }
 .group-panel h3,
 .group-block > h3 {

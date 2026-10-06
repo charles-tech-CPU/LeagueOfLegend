@@ -25,7 +25,7 @@
       </div>
 
       <!-- Arbre a elimination : cartes positionnees + traits SVG -->
-      <div v-if="board.kind === 'tree'" class="board-scroll">
+      <div v-if="board.kind === 'tree'" class="board-scroll full-bleed">
         <div class="canvas" :style="{ width: `${board.width}px`, height: `${board.height}px` }">
           <template v-for="lane in board.lanes" :key="lane.key">
             <div
@@ -42,7 +42,7 @@
                 v-for="col in lane.columns"
                 :key="col.x"
                 class="col-title"
-                :style="{ top: `${lane.top + 34}px`, left: `${col.x}px`, width: `${CARD_W}px` }"
+                :style="{ top: `${lane.top + 34}px`, left: `${col.x}px`, width: `${board.cardW}px` }"
               >
                 {{ col.labels.join(' · ') }}
               </div>
@@ -68,7 +68,7 @@
             :logos="logos"
             :sources="sources"
             :highlight="hovered"
-            :width="CARD_W"
+            :width="board.cardW"
             :height="CARD_H"
             @hover="hovered = $event"
           />
@@ -76,7 +76,7 @@
       </div>
 
       <!-- Phase suisse : colonnes par round, matchs regroupes par bilan -->
-      <div v-else class="board-scroll">
+      <div v-else class="board-scroll full-bleed">
         <div class="swiss">
           <div v-for="col in board.columns" :key="col.label" class="swiss-col">
             <div class="col-title">{{ col.label }}</div>
@@ -105,9 +105,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { teamLogoUrl } from '../services/api'
-import { CARD_H, CARD_W, buildBoards, slotSources } from '../bracketLayout'
+import { CARD_H, buildBoards, slotSources } from '../bracketLayout'
 import BracketMatchCard from './BracketMatchCard.vue'
 
 const props = defineProps({
@@ -117,8 +117,23 @@ const props = defineProps({
 
 const hovered = ref(null)
 
+// Largeur offerte aux arbres : celle des blocs .full-bleed (la page entiere)
+// moins leurs marges interieures et celles du bandeau de chaque cote.
+const BOARD_PAD = 14
+const avail = ref(0)
+let observer
+onMounted(() => {
+  const page = document.documentElement
+  observer = new ResizeObserver(() => {
+    const gutter = Number.parseFloat(getComputedStyle(page).getPropertyValue('--gutter')) || 0
+    avail.value = page.clientWidth - 2 * (gutter + BOARD_PAD)
+  })
+  observer.observe(page)
+})
+onBeforeUnmount(() => observer?.disconnect())
+
 const logos = computed(() => new Set(props.teams.filter(t => t.hasLogo).map(t => t.id)))
-const boards = computed(() => buildBoards(props.matches))
+const boards = computed(() => buildBoards(props.matches, avail.value))
 const sources = computed(() => slotSources(props.matches))
 
 function boardMatches(board) {
@@ -185,8 +200,11 @@ function recordTone(record) {
 }
 .board-scroll {
   overflow-x: auto;
-  padding: 4px 14px 14px;
-  margin: 0 -14px;
+  padding-top: 4px;
+  padding-bottom: 14px;
+  /* Meme valeur que BOARD_PAD : place pour les bandeaux qui debordent de 12px */
+  padding-left: calc(var(--gutter) + 14px);
+  padding-right: calc(var(--gutter) + 14px);
 }
 
 /* ----- Champion ----- */
@@ -244,6 +262,7 @@ function recordTone(record) {
 /* ----- Arbre ----- */
 .canvas {
   position: relative;
+  margin: 0 auto;
 }
 .lane-band {
   position: absolute;
@@ -316,11 +335,14 @@ function recordTone(record) {
 /* ----- Phase suisse ----- */
 .swiss {
   display: flex;
-  gap: 18px;
+  gap: 14px;
   align-items: flex-start;
+  justify-content: safe center;
 }
 .swiss-col {
-  flex: 0 0 236px;
+  flex: 1 1 0;
+  min-width: 180px;
+  max-width: 260px;
   display: flex;
   flex-direction: column;
   gap: 10px;
