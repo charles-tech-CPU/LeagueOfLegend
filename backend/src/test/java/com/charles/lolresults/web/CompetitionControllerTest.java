@@ -177,6 +177,24 @@ class CompetitionControllerTest {
     }
 
     @Test
+    void lAccesHttpsViaTailscaleEstAutoriseParCors() throws Exception {
+        mockMvc.perform(options("/api/competitions")
+                        .header("Origin", "https://serveur-foyer.tail0af124.ts.net:8443")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(
+                        header().string("Access-Control-Allow-Origin", "https://serveur-foyer.tail0af124.ts.net:8443"));
+    }
+
+    @Test
+    void unAutreSiteHttpsEstRefuseParCors() throws Exception {
+        mockMvc.perform(options("/api/competitions")
+                        .header("Origin", "https://autre-site.example")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void uneAutreOrigineEstRefuseeParCors() throws Exception {
         mockMvc.perform(options("/api/competitions")
                         .header("Origin", "http://autre-site.example")

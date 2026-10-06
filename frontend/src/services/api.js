@@ -1,10 +1,17 @@
 import axios from 'axios'
 
-// URL du backend Spring Boot en dev. A adapter le jour d'un deploiement
-// (variable d'environnement Vite, ex: import.meta.env.VITE_API_URL).
-const API_BASE_URL = `http://${window.location.hostname}:8080/api`
+// Ports du backend : HTTP en LAN (http://<ip>), HTTPS via Tailscale
+// (https://serveur-foyer.tail0af124.ts.net).
+const PORT_BACKEND_HTTP = 8080
+const PORT_BACKEND_HTTPS = 8380
+
+// L'API suit le protocole de la page : une page HTTPS qui appelle une API HTTP est
+// bloquee par le navigateur ("contenu mixte").
+const API_BASE_URL = window.location.protocol === 'https:'
+  ? `https://${window.location.hostname}:${PORT_BACKEND_HTTPS}/api`
+  : `http://${window.location.hostname}:${PORT_BACKEND_HTTP}/api`
 const api = axios.create({
-  baseURL: `http://${window.location.hostname}:8080/api`
+  baseURL: API_BASE_URL
 })
 
 export function teamLogoUrl(teamId) {
