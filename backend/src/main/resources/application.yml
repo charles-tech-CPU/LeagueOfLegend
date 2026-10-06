@@ -29,5 +29,6 @@ logging:
 
 app:
   cors:
-    # Vite en LAN (http://<ip>:5173) et l'acces HTTPS via Tailscale (https://<machine>.<tailnet>.ts.net:<port>)
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://*:5173,https://*.ts.net:[*]}
+    # Liste de motifs separes par des virgules (ex: http://*:8180,https://*:8280).
+    # Absente ou vide : Vite en LAN et acces HTTPS via Tailscale (WebConfig.DEFAULT_ALLOWED_ORIGINS).
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
