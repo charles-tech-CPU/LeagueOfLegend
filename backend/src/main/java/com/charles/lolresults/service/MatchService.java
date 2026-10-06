@@ -61,6 +61,13 @@ public class MatchService {
         return matches.stream().map(MatchDto::from).toList();
     }
 
+    @Transactional(readOnly = true)
+    public MatchDto findOne(Long id) {
+        return MatchDto.from(matchRepository
+                .findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Match introuvable : " + id)));
+    }
+
     public MatchDto create(MatchCreateDto dto) {
         Match match = new Match();
         applyFields(match, dto);

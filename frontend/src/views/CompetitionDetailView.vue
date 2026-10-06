@@ -108,8 +108,14 @@
               {{ m.status === 'COMPLETED' ? 'Joué' : 'À venir' }}
             </span>
           </td>
-          <td>
+          <td class="row-actions">
             <button :disabled="!canSave(edits[m.id])" @click="saveMatch(m)">Enregistrer</button>
+            <router-link
+              v-if="m.team1Id && m.team2Id"
+              :to="`/matches/${m.id}`"
+              class="details-link"
+              title="Champions, K/D/A et MVP"
+            >Détails</router-link>
           </td>
         </tr>
       </tbody>
@@ -583,6 +589,14 @@ onMounted(initialLoad)
 }
 .hint strong {
   color: var(--text);
+}
+.row-actions {
+  white-space: nowrap;
+}
+.details-link {
+  margin-left: 10px;
+  font-size: 0.85em;
+  font-weight: 600;
 }
 .playoff-options {
   margin-bottom: 24px;

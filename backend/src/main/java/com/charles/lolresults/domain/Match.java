@@ -104,4 +104,9 @@ public class Match {
     /** Slot (1 = team1, 2 = team2) ou inserer le perdant dans loserNextMatch. */
     @Column(name = "loser_next_match_slot")
     private Integer loserNextMatchSlot;
+
+    /** MVP de la serie, facultatif (le "Player of the Game" de chaque manche est dans MatchGame). */
+    @ManyToOne
+    @JoinColumn(name = "mvp_player_id")
+    private Player mvp;
 }

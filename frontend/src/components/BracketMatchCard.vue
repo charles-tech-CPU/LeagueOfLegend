@@ -11,7 +11,15 @@
         <span v-else>{{ shortDay(match.date) }}</span>
         <span v-if="time">· {{ time }}</span>
       </span>
-      <span class="bo">{{ match.bestOf }}</span>
+      <span class="head-right">
+        <router-link
+          v-if="match.team1Id != null && match.team2Id != null"
+          :to="`/matches/${match.id}`"
+          class="details-link"
+          title="Détails du match (champions, K/D/A, MVP)"
+        >Détails</router-link>
+        <span class="bo">{{ match.bestOf }}</span>
+      </span>
     </header>
 
     <div
@@ -143,6 +151,22 @@ function involves(id) {
 .live {
   color: var(--accent);
   font-weight: 700;
+}
+.head-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.details-link {
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.details-link:hover {
+  color: var(--accent);
+}
+.compact .details-link {
+  display: none;
 }
 .bo {
   flex-shrink: 0;

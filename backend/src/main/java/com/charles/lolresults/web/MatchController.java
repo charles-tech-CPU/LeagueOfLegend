@@ -2,7 +2,10 @@ package com.charles.lolresults.web;
 
 import com.charles.lolresults.domain.MatchStatus;
 import com.charles.lolresults.dto.MatchCreateDto;
+import com.charles.lolresults.dto.MatchDetailsDto;
+import com.charles.lolresults.dto.MatchDetailsUpdateDto;
 import com.charles.lolresults.dto.MatchDto;
+import com.charles.lolresults.service.MatchDetailsService;
 import com.charles.lolresults.service.MatchService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -15,9 +18,11 @@ import org.springframework.web.bind.annotation.*;
 public class MatchController {
 
     private final MatchService matchService;
+    private final MatchDetailsService matchDetailsService;
 
-    public MatchController(MatchService matchService) {
+    public MatchController(MatchService matchService, MatchDetailsService matchDetailsService) {
         this.matchService = matchService;
+        this.matchDetailsService = matchDetailsService;
     }
 
     /**
@@ -42,6 +47,11 @@ public class MatchController {
         throw new IllegalArgumentException("Precise competitionId, teamId ou status en parametre de requete");
     }
 
+    @GetMapping("/{id}")
+    public MatchDto findOne(@PathVariable Long id) {
+        return matchService.findOne(id);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public MatchDto create(@Valid @RequestBody MatchCreateDto dto) {
@@ -57,5 +67,17 @@ public class MatchController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
         matchService.delete(id);
+    }
+
+    /** Details facultatifs de la serie : manches, champions, K/D/A, MVP (vides si non saisis). */
+    @GetMapping("/{id}/details")
+    public MatchDetailsDto details(@PathVariable Long id) {
+        return matchDetailsService.find(id);
+    }
+
+    /** Remplace tous les details de la serie (aucune manche et MVP nul = details effaces). */
+    @PutMapping("/{id}/details")
+    public MatchDetailsDto replaceDetails(@PathVariable Long id, @Valid @RequestBody MatchDetailsUpdateDto dto) {
+        return matchDetailsService.replace(id, dto);
     }
 }

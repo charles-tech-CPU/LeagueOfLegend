@@ -19,4 +19,9 @@ public enum BestOf {
     public int getGamesToWin() {
         return gamesToWin;
     }
+
+    /** Nombre maximal de manches de la serie (un BO2 se joue toujours en deux manches). */
+    public int getMaxGames() {
+        return this == BO2 ? 2 : 2 * gamesToWin - 1;
+    }
 }

@@ -67,6 +67,11 @@ export default {
     api.get('/matches', { params: { status: 'SCHEDULED', from } }).then(r => r.data),
   createMatch: (payload) => api.post('/matches', payload).then(r => r.data),
   updateMatch: (id, payload) => api.put(`/matches/${id}`, payload).then(r => r.data),
+  getMatch: (id) => api.get(`/matches/${id}`).then(r => r.data),
+  // Details facultatifs d'une serie : manches, champions, K/D/A, MVP
+  getMatchDetails: (id) => api.get(`/matches/${id}/details`).then(r => r.data),
+  // payload : { mvpPlayerId, games: [{ gameNumber, winnerTeamId, mvpPlayerId, players: [...] }] }
+  saveMatchDetails: (id, payload) => api.put(`/matches/${id}/details`, payload).then(r => r.data),
   deleteMatch: (id) => api.delete(`/matches/${id}`),
 
   // Classement / tete-a-tete (calcules cote backend, jamais stockes)

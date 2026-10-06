@@ -16,7 +16,10 @@ import com.charles.lolresults.domain.Competition;
 import com.charles.lolresults.domain.Match;
 import com.charles.lolresults.domain.MatchStatus;
 import com.charles.lolresults.dto.MatchCreateDto;
+import com.charles.lolresults.dto.MatchDetailsDto;
+import com.charles.lolresults.dto.MatchDetailsUpdateDto;
 import com.charles.lolresults.dto.MatchDto;
+import com.charles.lolresults.service.MatchDetailsService;
 import com.charles.lolresults.service.MatchService;
 import java.time.LocalDate;
 import java.util.List;
@@ -38,6 +41,9 @@ class MatchControllerTest {
 
     @MockBean
     private MatchService matchService;
+
+    @MockBean
+    private MatchDetailsService matchDetailsService;
 
     @Test
     void rechercheParCompetition() throws Exception {
@@ -102,6 +108,50 @@ class MatchControllerTest {
         mockMvc.perform(delete("/api/matches/5")).andExpect(status().isNoContent());
 
         verify(matchService).delete(5L);
+    }
+
+    @Test
+    void lectureDUnMatch() throws Exception {
+        when(matchService.findOne(5L)).thenReturn(sampleDto());
+
+        mockMvc.perform(get("/api/matches/5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(5))
+                .andExpect(jsonPath("$.bestOf").value("BO3"));
+    }
+
+    @Test
+    void detailsVidesPourUnMatchSansSaisie() throws Exception {
+        when(matchDetailsService.find(5L)).thenReturn(new MatchDetailsDto(5L, null, null, List.of()));
+
+        mockMvc.perform(get("/api/matches/5/details"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.games.length()").value(0))
+                .andExpect(jsonPath("$.mvpPlayerId").doesNotExist());
+    }
+
+    @Test
+    void saisieDesDetailsDelegueAuService() throws Exception {
+        when(matchDetailsService.replace(eq(5L), any(MatchDetailsUpdateDto.class)))
+                .thenReturn(new MatchDetailsDto(5L, 7L, "Caps", List.of()));
+
+        mockMvc.perform(
+                        put("/api/matches/5/details")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"mvpPlayerId\":7,\"games\":[{\"gameNumber\":1,\"players\":[{\"playerId\":7,"
+                                                + "\"teamId\":1,\"position\":\"MID\",\"champion\":\"Ahri\",\"kills\":4,\"deaths\":1,\"assists\":6}]}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mvpPseudo").value("Caps"));
+    }
+
+    @Test
+    void saisieInvalideRefusee() throws Exception {
+        mockMvc.perform(put("/api/matches/5/details")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"games\":[{\"gameNumber\":6,\"players\":[{\"playerId\":7,\"teamId\":1,"
+                                + "\"position\":\"MID\",\"champion\":\"\",\"kills\":-1}]}]}"))
+                .andExpect(status().isBadRequest());
     }
 
     private static MatchDto sampleDto() {
