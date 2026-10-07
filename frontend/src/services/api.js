@@ -85,5 +85,8 @@ export default {
   getStandings: (competitionId, groupId) =>
     api.get('/standings', { params: { competitionId, groupId } }).then(r => r.data),
   getHeadToHead: (competitionId, groupId) =>
-    api.get('/head-to-head', { params: { competitionId, groupId } }).then(r => r.data)
+    api.get('/head-to-head', { params: { competitionId, groupId } }).then(r => r.data),
+
+  // Statistiques (picks/bans, MVP, KDA) : par competition, par saison, ou tout l'historique
+  getStats: (params) => api.get('/stats', { params }).then(r => r.data)
 }

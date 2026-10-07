@@ -20,7 +20,8 @@ public record MatchDetailsUpdateDto(Long mvpPlayerId, @Valid List<Game> games) {
             @NotNull @Min(1) @Max(5) Integer gameNumber,
             Long winnerTeamId,
             Long mvpPlayerId,
-            @Valid List<Line> players) {}
+            @Valid List<Line> players,
+            @Valid List<Ban> bans) {}
 
     /** K/D/A facultatifs : le champion peut etre connu sans le score du joueur. */
     public record Line(
@@ -31,4 +32,8 @@ public record MatchDetailsUpdateDto(Long mvpPlayerId, @Valid List<Game> games) {
             @PositiveOrZero Integer kills,
             @PositiveOrZero Integer deaths,
             @PositiveOrZero Integer assists) {}
+
+    /** Champion banni par une equipe, non lie a un joueur. */
+    public record Ban(
+            @NotNull Long teamId, @NotBlank @Size(max = 30) String champion) {}
 }

@@ -43,6 +43,10 @@ public class MatchGame {
     @OrderBy("id")
     private List<MatchGamePlayer> players = new ArrayList<>();
 
+    @OneToMany(mappedBy = "game", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id")
+    private List<MatchGameBan> bans = new ArrayList<>();
+
     public MatchGame(Match match, Integer gameNumber) {
         this.match = match;
         this.gameNumber = gameNumber;

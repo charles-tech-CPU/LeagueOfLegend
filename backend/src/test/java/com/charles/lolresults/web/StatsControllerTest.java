@@ -1,0 +1,54 @@
+package com.charles.lolresults.web;
+
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.charles.lolresults.dto.StatsDto;
+import com.charles.lolresults.service.StatsService;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+@WebMvcTest(StatsController.class)
+class StatsControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private StatsService statsService;
+
+    @Test
+    void statsDUneCompetition() throws Exception {
+        when(statsService.compute(1L, null))
+                .thenReturn(new StatsDto(
+                        List.of(new StatsDto.ChampionStat("Ahri", 3, 1, 4)),
+                        List.of(new StatsDto.MvpStat(10L, "Caps", "G2", 2, 1)),
+                        List.of(new StatsDto.KdaStat(10L, "Caps", "G2", 20, 5, 30, 10.0))));
+
+        mockMvc.perform(get("/api/stats").param("competitionId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.champions[0].champion").value("Ahri"))
+                .andExpect(jsonPath("$.mvps[0].pseudo").value("Caps"))
+                .andExpect(jsonPath("$.kda[0].ratio").value(10.0));
+    }
+
+    @Test
+    void statsDUneSaison() throws Exception {
+        when(statsService.compute(null, 2024)).thenReturn(new StatsDto(List.of(), List.of(), List.of()));
+
+        mockMvc.perform(get("/api/stats").param("season", "2024")).andExpect(status().isOk());
+    }
+
+    @Test
+    void statsSansParametreCouvreToutLHistorique() throws Exception {
+        when(statsService.compute(null, null)).thenReturn(new StatsDto(List.of(), List.of(), List.of()));
+
+        mockMvc.perform(get("/api/stats")).andExpect(status().isOk());
+    }
+}

@@ -82,6 +82,10 @@
     <StageManager :competition="competition" :stages="stages" :teams="teams" @changed="load" />
   </section>
 
+  <section v-if="activeTab === 'stats'" class="tab-panel">
+    <StatsPanel :scope="{ competitionId: id }" />
+  </section>
+
   <section v-if="activeTab === 'calendar'" class="tab-panel">
     <div class="table-scroll full-bleed">
     <table v-if="sortedMatches.length">
@@ -96,6 +100,7 @@
           <th></th>
           <th></th>
           <th>Équipe 2</th>
+          <th>Détails</th>
           <th>Statut</th>
           <th></th>
         </tr>
@@ -103,6 +108,27 @@
       <tbody>
         <tr v-for="m in sortedMatches" :key="m.id" :class="{ 'row-scheduled': m.status === 'SCHEDULED' }">
           <MatchEditCells v-model="edits[m.id]" :teams="teams" />
+          <td class="details-preview">
+            <span v-if="m.team1Champions?.length" class="champ-icons">
+              <img
+                v-for="(c, i) in m.team1Champions"
+                :key="'t1-' + i"
+                :src="championIconUrl(c)"
+                :alt="c"
+                :title="c"
+              />
+            </span>
+            <span v-if="m.team2Champions?.length" class="champ-icons">
+              <img
+                v-for="(c, i) in m.team2Champions"
+                :key="'t2-' + i"
+                :src="championIconUrl(c)"
+                :alt="c"
+                :title="c"
+              />
+            </span>
+            <span v-if="m.mvpPseudo" class="mvp-badge" title="MVP de la série">⭐ {{ m.mvpPseudo }}</span>
+          </td>
           <td>
             <span class="status-badge" :class="m.status === 'COMPLETED' ? 'completed' : 'scheduled'">
               {{ m.status === 'COMPLETED' ? 'Joué' : 'À venir' }}
@@ -203,7 +229,9 @@ import { canSave, kickoff, toEditForm, toMatchPayload } from '../matchEdit'
 import { useSort } from '../composables/useSort'
 import MatchEditCells from '../components/MatchEditCells.vue'
 import StageManager from '../components/StageManager.vue'
+import StatsPanel from '../components/StatsPanel.vue'
 import { splitLabel } from '../formats'
+import { championIconUrl } from '../champions'
 
 const props = defineProps({
   id: { type: [String, Number], required: true }
@@ -229,7 +257,8 @@ const tabs = computed(() => [
   ...(regionalFinalsMatches.value.length ? [{ key: 'regionalFinals', label: 'Regional Finals', icon: '🌏' }] : []),
   { key: 'h2h', label: 'Confrontations', icon: '⚔️' },
   { key: 'calendar', label: 'Calendrier', icon: '📅' },
-  { key: 'format', label: 'Format', icon: '🧩' }
+  { key: 'format', label: 'Format', icon: '🧩' },
+  { key: 'stats', label: 'Stats', icon: '📈' }
 ])
 
 const playedCount = computed(() => matches.value.filter(m => m.status === 'COMPLETED').length)
@@ -591,6 +620,28 @@ onMounted(initialLoad)
   color: var(--text);
 }
 .row-actions {
+  white-space: nowrap;
+}
+.details-preview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.champ-icons {
+  display: inline-flex;
+  gap: 2px;
+}
+.champ-icons img {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  object-fit: cover;
+}
+.mvp-badge {
+  font-size: 0.78em;
+  font-weight: 600;
+  color: var(--gold-bright);
   white-space: nowrap;
 }
 .details-link {

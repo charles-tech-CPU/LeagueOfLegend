@@ -6,6 +6,7 @@ import com.charles.lolresults.domain.MatchPhase;
 import com.charles.lolresults.domain.MatchStatus;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 public record MatchDto(
         Long id,
@@ -33,8 +34,17 @@ public record MatchDto(
         Long nextMatchId,
         Integer nextMatchSlot,
         Long loserNextMatchId,
-        Integer loserNextMatchSlot) {
+        Integer loserNextMatchSlot,
+        Long mvpPlayerId,
+        String mvpPseudo,
+        /** Champions de la derniere manche jouee de la serie, dans l'ordre des postes (vide si rien de saisi). */
+        List<String> team1Champions,
+        List<String> team2Champions) {
     public static MatchDto from(Match m) {
+        return from(m, List.of(), List.of());
+    }
+
+    public static MatchDto from(Match m, List<String> team1Champions, List<String> team2Champions) {
         return new MatchDto(
                 m.getId(),
                 m.getCompetition().getId(),
@@ -61,6 +71,10 @@ public record MatchDto(
                 m.getNextMatch() != null ? m.getNextMatch().getId() : null,
                 m.getNextMatchSlot(),
                 m.getLoserNextMatch() != null ? m.getLoserNextMatch().getId() : null,
-                m.getLoserNextMatchSlot());
+                m.getLoserNextMatchSlot(),
+                m.getMvp() != null ? m.getMvp().getId() : null,
+                m.getMvp() != null ? m.getMvp().getPseudo() : null,
+                team1Champions,
+                team2Champions);
     }
 }

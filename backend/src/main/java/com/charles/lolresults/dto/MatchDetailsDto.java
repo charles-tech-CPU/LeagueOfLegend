@@ -2,6 +2,7 @@ package com.charles.lolresults.dto;
 
 import com.charles.lolresults.domain.Match;
 import com.charles.lolresults.domain.MatchGame;
+import com.charles.lolresults.domain.MatchGameBan;
 import com.charles.lolresults.domain.MatchGamePlayer;
 import com.charles.lolresults.domain.Player;
 import com.charles.lolresults.domain.Position;
@@ -13,14 +14,27 @@ import java.util.List;
  */
 public record MatchDetailsDto(Long matchId, Long mvpPlayerId, String mvpPseudo, List<Game> games) {
 
-    public record Game(Integer gameNumber, Long winnerTeamId, Long mvpPlayerId, String mvpPseudo, List<Line> players) {
+    public record Game(
+            Integer gameNumber,
+            Long winnerTeamId,
+            Long mvpPlayerId,
+            String mvpPseudo,
+            List<Line> players,
+            List<Ban> bans) {
         static Game from(MatchGame game) {
             return new Game(
                     game.getGameNumber(),
                     game.getWinner() != null ? game.getWinner().getId() : null,
                     idOf(game.getMvp()),
                     pseudoOf(game.getMvp()),
-                    game.getPlayers().stream().map(Line::from).toList());
+                    game.getPlayers().stream().map(Line::from).toList(),
+                    game.getBans().stream().map(Ban::from).toList());
+        }
+    }
+
+    public record Ban(Long teamId, String champion) {
+        static Ban from(MatchGameBan ban) {
+            return new Ban(ban.getTeam().getId(), ban.getChampion());
         }
     }
 

@@ -133,6 +133,24 @@
                 </tr>
               </tbody>
             </table>
+
+            <div class="bans">
+              <span class="label">Bans {{ side.code }}</span>
+              <div class="ban-list">
+                <span v-for="(ban, i) in g.bans[side.teamId]" :key="i" class="ban-row">
+                  <input
+                    v-model="g.bans[side.teamId][i]"
+                    class="champion-input ban-input"
+                    :class="{ invalid: isUnknownChampion(ban) }"
+                    list="champion-list"
+                    placeholder="Champion banni"
+                    :aria-label="`Ban ${i + 1} ${side.code}`"
+                  />
+                  <button type="button" class="ban-remove" title="Retirer ce ban" @click="removeBan(g, side.teamId, i)">✕</button>
+                </span>
+                <button type="button" class="ban-add" @click="addBan(g, side.teamId)">+ Ban</button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -245,20 +263,38 @@ function emptyLine() {
   return { playerId: null, champion: '', kills: '', deaths: '', assists: '' }
 }
 
+// Nombre de bans proposes par defaut par equipe (format habituel) : on peut en ajouter
+// ou en retirer librement, rien n'impose cette limite.
+const DEFAULT_BANS = 5
+
 function isFilled(game) {
   return game.winnerTeamId != null || game.mvpPlayerId != null ||
-    Object.values(game.lines).some(byPos => Object.values(byPos).some(l => l.champion.trim()))
+    Object.values(game.lines).some(byPos => Object.values(byPos).some(l => l.champion.trim())) ||
+    Object.values(game.bans).some(list => list.some(c => c.trim()))
+}
+
+function addBan(game, teamId) {
+  game.bans[teamId].push('')
+}
+
+function removeBan(game, teamId, index) {
+  game.bans[teamId].splice(index, 1)
 }
 
 /** Formulaire d'une game : chaque poste pre-rempli avec le joueur de l'effectif a ce poste. */
 function buildGame(gameNumber, saved) {
   const lines = {}
+  const bans = {}
   for (const side of sides.value) {
     lines[side.teamId] = {}
     for (const pos of POSITIONS) {
       const atPosition = rosterOf(side.teamId).filter(p => p.position === pos.key)
       lines[side.teamId][pos.key] = { ...emptyLine(), playerId: atPosition.length === 1 ? atPosition[0].id : null }
     }
+    const savedBans = (saved?.bans ?? []).filter(b => b.teamId === side.teamId).map(b => b.champion)
+    bans[side.teamId] = savedBans.length
+      ? [...savedBans, ...Array(Math.max(0, DEFAULT_BANS - savedBans.length)).fill('')]
+      : Array(DEFAULT_BANS).fill('')
   }
   for (const l of saved?.players ?? []) {
     lines[l.teamId][l.position] = {
@@ -273,7 +309,8 @@ function buildGame(gameNumber, saved) {
     gameNumber,
     winnerTeamId: saved?.winnerTeamId ?? null,
     mvpPlayerId: saved?.mvpPlayerId ?? null,
-    lines
+    lines,
+    bans
   }
 }
 
@@ -321,16 +358,29 @@ function linePayload(g, side, pos) {
   }
 }
 
+/** Bans d'une equipe prets a envoyer ; leve une erreur si un champion saisi est inconnu. */
+function bansPayload(g, side) {
+  return g.bans[side.teamId]
+    .map(c => c.trim())
+    .filter(c => c)
+    .map(champion => {
+      const official = championName(champion)
+      if (!official) throw new Error(`Game ${g.gameNumber} : champion banni inconnu « ${champion} »`)
+      return { teamId: side.teamId, champion: official }
+    })
+}
+
 function toPayload() {
   const payloadGames = games.value.map(g => {
     const players = sides.value
       .flatMap(side => POSITIONS.map(pos => linePayload(g, side, pos)))
       .filter(line => line != null)
-    return { gameNumber: g.gameNumber, winnerTeamId: g.winnerTeamId, mvpPlayerId: g.mvpPlayerId, players }
+    const bans = sides.value.flatMap(side => bansPayload(g, side))
+    return { gameNumber: g.gameNumber, winnerTeamId: g.winnerTeamId, mvpPlayerId: g.mvpPlayerId, players, bans }
   })
   return {
     mvpPlayerId: seriesMvp.value,
-    games: payloadGames.filter(g => g.winnerTeamId != null || g.mvpPlayerId != null || g.players.length)
+    games: payloadGames.filter(g => g.winnerTeamId != null || g.mvpPlayerId != null || g.players.length || g.bans.length)
   }
 }
 
@@ -583,6 +633,37 @@ onMounted(load)
 }
 .champion-input.invalid {
   border-color: var(--loss);
+}
+.bans {
+  margin-top: 14px;
+}
+.ban-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ban-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ban-input {
+  width: 130px;
+}
+.ban-remove {
+  padding: 4px 7px;
+  font-size: 0.75em;
+  color: var(--text-muted);
+  background: none;
+  box-shadow: none;
+}
+.ban-remove:hover {
+  color: var(--loss);
+}
+.ban-add {
+  font-size: 0.82em;
+  padding: 7px 12px;
 }
 .kda-input {
   width: 48px;

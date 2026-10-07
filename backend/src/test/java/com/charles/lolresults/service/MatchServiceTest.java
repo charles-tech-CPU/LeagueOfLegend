@@ -10,13 +10,18 @@ import com.charles.lolresults.domain.BestOf;
 import com.charles.lolresults.domain.Competition;
 import com.charles.lolresults.domain.CompetitionGroup;
 import com.charles.lolresults.domain.Match;
+import com.charles.lolresults.domain.MatchGame;
+import com.charles.lolresults.domain.MatchGamePlayer;
 import com.charles.lolresults.domain.MatchPhase;
 import com.charles.lolresults.domain.MatchStatus;
+import com.charles.lolresults.domain.Player;
+import com.charles.lolresults.domain.Position;
 import com.charles.lolresults.domain.Team;
 import com.charles.lolresults.dto.MatchCreateDto;
 import com.charles.lolresults.dto.MatchDto;
 import com.charles.lolresults.repository.CompetitionGroupRepository;
 import com.charles.lolresults.repository.CompetitionRepository;
+import com.charles.lolresults.repository.MatchGamePlayerRepository;
 import com.charles.lolresults.repository.MatchRepository;
 import com.charles.lolresults.repository.TeamRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -48,6 +53,9 @@ class MatchServiceTest {
     @Mock
     private TeamRepository teamRepository;
 
+    @Mock
+    private MatchGamePlayerRepository gamePlayerRepository;
+
     @InjectMocks
     private MatchService matchService;
 
@@ -71,6 +79,7 @@ class MatchServiceTest {
         when(matchRepository.findById(100L)).thenReturn(Optional.of(nextMatch));
         when(matchRepository.findById(200L)).thenReturn(Optional.of(loserNextMatch));
         when(matchRepository.save(any(Match.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(gamePlayerRepository.findByGame_Match_Competition_Id(any())).thenReturn(List.of());
     }
 
     @Test
@@ -190,6 +199,43 @@ class MatchServiceTest {
 
         matchService.delete(1L);
         verify(matchRepository).deleteById(1L);
+    }
+
+    @Test
+    void findByCompetitionEnrichitLesChampionsDeLaDerniereMancheEtLeMvpDeSerie() {
+        Match match = new Match();
+        match.setId(42L);
+        match.setCompetition(new Competition());
+        match.setTeam1(g2);
+        match.setTeam2(fnc);
+        Player caps = new Player(g2, "Caps", null, Position.MID);
+        caps.setId(10L);
+        match.setMvp(caps);
+
+        MatchGame game1 = new MatchGame(match, 1);
+        MatchGame game2 = new MatchGame(match, 2);
+        when(matchRepository.findByCompetitionIdOrderByDateAscTimeAsc(1L)).thenReturn(List.of(match));
+        when(gamePlayerRepository.findByGame_Match_Competition_Id(1L))
+                .thenReturn(
+                        List.of(lineOf(game1, g2, "Ahri"), lineOf(game2, g2, "Orianna"), lineOf(game2, fnc, "Zed")));
+
+        List<MatchDto> dtos = matchService.findByCompetition(1L);
+
+        assertThat(dtos).hasSize(1);
+        MatchDto dto = dtos.get(0);
+        assertThat(dto.mvpPseudo()).isEqualTo("Caps");
+        // Game 2 est la derniere manche jouee : ses champions sont retenus, pas ceux de la game 1.
+        assertThat(dto.team1Champions()).containsExactly("Orianna");
+        assertThat(dto.team2Champions()).containsExactly("Zed");
+    }
+
+    private static MatchGamePlayer lineOf(MatchGame game, Team team, String champion) {
+        MatchGamePlayer line = new MatchGamePlayer();
+        line.setGame(game);
+        line.setTeam(team);
+        line.setPosition(Position.MID);
+        line.setChampion(champion);
+        return line;
     }
 
     @Test

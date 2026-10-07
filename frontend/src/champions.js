@@ -182,3 +182,40 @@ const BY_LOWER = new Map(CHAMPIONS.map(c => [c.toLowerCase(), c]))
 export function championName(input) {
   return BY_LOWER.get((input ?? '').trim().toLowerCase()) ?? null
 }
+
+// Identifiant Data Dragon (CDN officiel Riot) des champions dont le nom contient un
+// caractere que Data Dragon n'utilise pas (espace, apostrophe, point, "&") ou dont la
+// casse differe. Les autres noms sont deja l'identifiant Data Dragon tel quel.
+const DDRAGON_ID = {
+  'Aurelion Sol': 'AurelionSol',
+  "Bel'Veth": 'Belveth',
+  "Cho'Gath": 'Chogath',
+  'Dr. Mundo': 'DrMundo',
+  'Jarvan IV': 'JarvanIV',
+  "K'Sante": 'KSante',
+  "Kai'Sa": 'Kaisa',
+  "Kha'Zix": 'Khazix',
+  "Kog'Maw": 'KogMaw',
+  LeBlanc: 'Leblanc',
+  'Lee Sin': 'LeeSin',
+  'Master Yi': 'MasterYi',
+  'Miss Fortune': 'MissFortune',
+  'Nunu & Willump': 'Nunu',
+  "Rek'Sai": 'RekSai',
+  'Renata Glasc': 'Renata',
+  'Tahm Kench': 'TahmKench',
+  'Twisted Fate': 'TwistedFate',
+  "Vel'Koz": 'Velkoz',
+  Wukong: 'MonkeyKing',
+  'Xin Zhao': 'XinZhao'
+}
+
+const DDRAGON_VERSION = '14.20.1'
+
+/** Icone carree du champion (CDN public Data Dragon), ou null si le nom est inconnu. */
+export function championIconUrl(input) {
+  const official = championName(input)
+  if (!official) return null
+  const id = DDRAGON_ID[official] ?? official.replace(/[^a-zA-Z0-9]/g, '')
+  return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/champion/${id}.png`
+}

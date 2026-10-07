@@ -7,6 +7,7 @@ import PlayersView from '../views/PlayersView.vue'
 import PlayerDetailView from '../views/PlayerDetailView.vue'
 import UpcomingMatchesView from '../views/UpcomingMatchesView.vue'
 import MatchDetailView from '../views/MatchDetailView.vue'
+import StatsView from '../views/StatsView.vue'
 
 const routes = [
   { path: '/', name: 'competitions', component: CompetitionsView },
@@ -16,7 +17,8 @@ const routes = [
   { path: '/players', name: 'players', component: PlayersView },
   { path: '/players/:id', name: 'player-detail', component: PlayerDetailView, props: true },
   { path: '/upcoming', name: 'upcoming', component: UpcomingMatchesView },
-  { path: '/matches/:id', name: 'match-detail', component: MatchDetailView, props: true }
+  { path: '/matches/:id', name: 'match-detail', component: MatchDetailView, props: true },
+  { path: '/stats', name: 'stats', component: StatsView }
 ]
 
 export default createRouter({

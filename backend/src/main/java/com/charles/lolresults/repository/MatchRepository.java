@@ -22,6 +22,9 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
 
     List<Match> findByStageId(Long stageId);
 
+    /** Matchs d'une saison, toutes competitions confondues (pour le MVP de serie dans l'onglet Stats). */
+    List<Match> findByCompetition_Season(Integer season);
+
     /** [competitionId, nombre de matchs, nombre de matchs joues] pour chaque competition d'une saison. */
     @Query("select m.competition.id, count(m), sum(case when m.status = :completed then 1 else 0 end) "
             + "from Match m where m.competition.season = :season group by m.competition.id")

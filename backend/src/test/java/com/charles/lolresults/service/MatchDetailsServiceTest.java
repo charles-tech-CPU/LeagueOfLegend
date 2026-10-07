@@ -16,6 +16,7 @@ import com.charles.lolresults.domain.Position;
 import com.charles.lolresults.domain.Team;
 import com.charles.lolresults.dto.MatchDetailsDto;
 import com.charles.lolresults.dto.MatchDetailsUpdateDto;
+import com.charles.lolresults.dto.MatchDetailsUpdateDto.Ban;
 import com.charles.lolresults.dto.MatchDetailsUpdateDto.Game;
 import com.charles.lolresults.dto.MatchDetailsUpdateDto.Line;
 import com.charles.lolresults.repository.MatchGameRepository;
@@ -87,7 +88,8 @@ class MatchDetailsServiceTest {
                 10L,
                 List.of(
                         new Line(10L, 1L, Position.MID, " Ahri ", 4, 1, 6),
-                        new Line(20L, 2L, Position.MID, "Orianna", null, null, null)));
+                        new Line(20L, 2L, Position.MID, "Orianna", null, null, null)),
+                List.of(new Ban(1L, " Zed "), new Ban(2L, "Yone")));
 
         MatchDetailsDto dto = service.replace(5L, new MatchDetailsUpdateDto(10L, List.of(game1)));
 
@@ -100,6 +102,26 @@ class MatchDetailsServiceTest {
         assertThat(saved.players()).extracting(MatchDetailsDto.Line::champion).containsExactly("Ahri", "Orianna");
         assertThat(saved.players().get(0).kills()).isEqualTo(4);
         assertThat(saved.players().get(1).kills()).isNull();
+        assertThat(saved.bans()).extracting(MatchDetailsDto.Ban::champion).containsExactly("Zed", "Yone");
+        assertThat(saved.bans().get(0).teamId()).isEqualTo(1L);
+    }
+
+    @Test
+    void refuseUnBanChoisiDeuxFoisParLaMemeEquipe() {
+        Game game = new Game(1, null, null, List.of(), List.of(new Ban(1L, "Zed"), new Ban(1L, "zed")));
+
+        assertThatThrownBy(() -> service.replace(5L, new MatchDetailsUpdateDto(null, List.of(game))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("banni deux fois");
+    }
+
+    @Test
+    void uneMancheAvecSeulementDesBansEstConsidereeRemplie() {
+        Game game = new Game(1, null, null, List.of(), List.of(new Ban(1L, "Zed")));
+
+        MatchDetailsDto dto = service.replace(5L, new MatchDetailsUpdateDto(null, List.of(game)));
+
+        assertThat(dto.games()).hasSize(1);
     }
 
     @Test
@@ -107,8 +129,8 @@ class MatchDetailsServiceTest {
         MatchGame old = new MatchGame(match, 1);
         when(gameRepository.findByMatchIdOrderByGameNumber(5L)).thenReturn(List.of(old));
 
-        MatchDetailsDto dto =
-                service.replace(5L, new MatchDetailsUpdateDto(null, List.of(new Game(2, null, null, List.of()))));
+        MatchDetailsDto dto = service.replace(
+                5L, new MatchDetailsUpdateDto(null, List.of(new Game(2, null, null, List.of(), List.of()))));
 
         assertThat(dto.games()).isEmpty();
         verify(gameRepository).deleteAll(List.of(old));
@@ -116,7 +138,7 @@ class MatchDetailsServiceTest {
 
     @Test
     void refuseUneMancheImpossibleDansLeFormat() {
-        Game game4 = new Game(4, 1L, null, null);
+        Game game4 = new Game(4, 1L, null, null, null);
 
         assertThatThrownBy(() -> service.replace(5L, new MatchDetailsUpdateDto(null, List.of(game4))))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -131,7 +153,8 @@ class MatchDetailsServiceTest {
                 null,
                 List.of(
                         new Line(10L, 1L, Position.MID, "Ahri", null, null, null),
-                        new Line(20L, 2L, Position.MID, "ahri", null, null, null)));
+                        new Line(20L, 2L, Position.MID, "ahri", null, null, null)),
+                List.of());
 
         assertThatThrownBy(() -> service.replace(5L, new MatchDetailsUpdateDto(null, List.of(game))))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -147,7 +170,8 @@ class MatchDetailsServiceTest {
                 null,
                 List.of(
                         new Line(10L, 1L, Position.MID, "Ahri", null, null, null),
-                        new Line(11L, 1L, Position.MID, "Lux", null, null, null)));
+                        new Line(11L, 1L, Position.MID, "Lux", null, null, null)),
+                List.of());
 
         assertThatThrownBy(() -> service.replace(5L, new MatchDetailsUpdateDto(null, List.of(game))))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -156,7 +180,7 @@ class MatchDetailsServiceTest {
 
     @Test
     void refuseUneEquipeQuiNeJouePasLeMatch() {
-        Game game = new Game(1, 3L, null, null);
+        Game game = new Game(1, 3L, null, null, null);
 
         assertThatThrownBy(() -> service.replace(5L, new MatchDetailsUpdateDto(null, List.of(game))))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -165,7 +189,8 @@ class MatchDetailsServiceTest {
 
     @Test
     void leMvpDoitAvoirJoueLaManche() {
-        Game game = new Game(1, null, 99L, List.of(new Line(10L, 1L, Position.MID, "Ahri", null, null, null)));
+        Game game =
+                new Game(1, null, 99L, List.of(new Line(10L, 1L, Position.MID, "Ahri", null, null, null)), List.of());
 
         assertThatThrownBy(() -> service.replace(5L, new MatchDetailsUpdateDto(null, List.of(game))))
                 .isInstanceOf(IllegalArgumentException.class)

@@ -2,6 +2,7 @@ package com.charles.lolresults.service;
 
 import com.charles.lolresults.domain.Match;
 import com.charles.lolresults.domain.MatchGame;
+import com.charles.lolresults.domain.MatchGameBan;
 import com.charles.lolresults.domain.MatchGamePlayer;
 import com.charles.lolresults.domain.Player;
 import com.charles.lolresults.domain.Position;
@@ -141,13 +142,29 @@ public class MatchDetailsService {
             throw new IllegalArgumentException(label + "le MVP doit faire partie des joueurs de la manche");
         }
         game.setMvp(mvp);
+
+        Set<String> bannedByTeam = new HashSet<>();
+        List<MatchDetailsUpdateDto.Ban> bansDto = g.bans() == null ? List.of() : g.bans();
+        for (MatchDetailsUpdateDto.Ban b : bansDto) {
+            Team team = teamOfMatch(match, b.teamId(), label);
+            String champion = b.champion().trim();
+            if (!bannedByTeam.add(team.getId() + ":" + champion.toLowerCase(Locale.ROOT))) {
+                throw new IllegalArgumentException(label + champion + " est banni deux fois par " + team.getCode());
+            }
+            MatchGameBan ban = new MatchGameBan();
+            ban.setGame(game);
+            ban.setTeam(team);
+            ban.setChampion(champion);
+            game.getBans().add(ban);
+        }
         return game;
     }
 
     private static boolean isFilled(MatchDetailsUpdateDto.Game g) {
         return g.winnerTeamId() != null
                 || g.mvpPlayerId() != null
-                || (g.players() != null && !g.players().isEmpty());
+                || (g.players() != null && !g.players().isEmpty())
+                || (g.bans() != null && !g.bans().isEmpty());
     }
 
     private static Team teamOfMatch(Match match, Long teamId, String label) {

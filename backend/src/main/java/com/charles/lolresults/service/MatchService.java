@@ -5,12 +5,16 @@ import com.charles.lolresults.dto.MatchCreateDto;
 import com.charles.lolresults.dto.MatchDto;
 import com.charles.lolresults.repository.CompetitionGroupRepository;
 import com.charles.lolresults.repository.CompetitionRepository;
+import com.charles.lolresults.repository.MatchGamePlayerRepository;
 import com.charles.lolresults.repository.MatchRepository;
 import com.charles.lolresults.repository.TeamRepository;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,22 +28,55 @@ public class MatchService {
     private final CompetitionRepository competitionRepository;
     private final CompetitionGroupRepository groupRepository;
     private final TeamRepository teamRepository;
+    private final MatchGamePlayerRepository gamePlayerRepository;
 
     public MatchService(
             MatchRepository matchRepository,
             CompetitionRepository competitionRepository,
             CompetitionGroupRepository groupRepository,
-            TeamRepository teamRepository) {
+            TeamRepository teamRepository,
+            MatchGamePlayerRepository gamePlayerRepository) {
         this.matchRepository = matchRepository;
         this.competitionRepository = competitionRepository;
         this.groupRepository = groupRepository;
         this.teamRepository = teamRepository;
+        this.gamePlayerRepository = gamePlayerRepository;
     }
 
+    /**
+     * Les champions de l'apercu compact (derniere manche jouee de la serie) sont charges en
+     * une seule requete pour toute la competition, pour eviter un N+1 sur la liste des matchs.
+     */
     @Transactional(readOnly = true)
     public List<MatchDto> findByCompetition(Long competitionId) {
-        return matchRepository.findByCompetitionIdOrderByDateAscTimeAsc(competitionId).stream()
-                .map(MatchDto::from)
+        List<Match> matches = matchRepository.findByCompetitionIdOrderByDateAscTimeAsc(competitionId);
+        Map<Long, List<MatchGamePlayer>> linesByMatch =
+                gamePlayerRepository.findByGame_Match_Competition_Id(competitionId).stream()
+                        .collect(Collectors.groupingBy(
+                                l -> l.getGame().getMatch().getId()));
+        return matches.stream().map(m -> toDto(m, linesByMatch.get(m.getId()))).toList();
+    }
+
+    private static MatchDto toDto(Match m, List<MatchGamePlayer> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return MatchDto.from(m);
+        }
+        int lastGameNumber =
+                lines.stream().mapToInt(l -> l.getGame().getGameNumber()).max().orElse(0);
+        List<MatchGamePlayer> lastGame = lines.stream()
+                .filter(l -> l.getGame().getGameNumber() == lastGameNumber)
+                .toList();
+        return MatchDto.from(m, championsOf(lastGame, m.getTeam1()), championsOf(lastGame, m.getTeam2()));
+    }
+
+    private static List<String> championsOf(List<MatchGamePlayer> lines, Team team) {
+        if (team == null) {
+            return List.of();
+        }
+        return lines.stream()
+                .filter(l -> l.getTeam().getId().equals(team.getId()))
+                .sorted(Comparator.comparing(MatchGamePlayer::getPosition))
+                .map(MatchGamePlayer::getChampion)
                 .toList();
     }
 
