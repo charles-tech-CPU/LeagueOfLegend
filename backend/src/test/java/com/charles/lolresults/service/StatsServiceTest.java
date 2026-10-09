@@ -15,6 +15,7 @@ import com.charles.lolresults.repository.MatchGameBanRepository;
 import com.charles.lolresults.repository.MatchGamePlayerRepository;
 import com.charles.lolresults.repository.MatchGameRepository;
 import com.charles.lolresults.repository.MatchRepository;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -145,6 +146,86 @@ class StatsServiceTest {
         assertThat(capsStat.deaths()).isEqualTo(2L);
         assertThat(capsStat.assists()).isEqualTo(10L);
         assertThat(capsStat.ratio()).isEqualTo(10.0);
+    }
+
+    @Test
+    void afficheLEquipeDeLaDerniereMancheEtLePostePrincipal() {
+        // Caps joue d'abord chez FNC puis chez G2, deux fois MID et une fois ADC.
+        MatchGamePlayer old = line(caps, fnc, "Ahri", 1, 1, 1, Position.MID, LocalDate.of(2018, 5, 1), 1);
+        MatchGamePlayer recentGame1 = line(caps, g2, "Ezreal", 2, 1, 2, Position.ADC, LocalDate.of(2024, 5, 1), 1);
+        MatchGamePlayer recentGame2 = line(caps, g2, "Azir", 3, 0, 4, Position.MID, LocalDate.of(2024, 5, 1), 2);
+        when(gamePlayerRepository.findByGame_Match_Competition_Id(COMPETITION_ID))
+                .thenReturn(List.of(recentGame2, old, recentGame1));
+        Match match = new Match();
+        match.setMvp(caps);
+        when(matchRepository.findByCompetitionIdOrderByDateAscTimeAsc(COMPETITION_ID))
+                .thenReturn(List.of(match));
+        when(gameRepository.findByMatch_Competition_Id(COMPETITION_ID)).thenReturn(List.of());
+        when(gameBanRepository.findByGame_Match_Competition_Id(COMPETITION_ID)).thenReturn(List.of());
+
+        StatsDto stats = statsService.compute(COMPETITION_ID, null);
+
+        StatsDto.KdaStat kda = stats.kda().get(0);
+        assertThat(kda.teamCode()).isEqualTo("G2");
+        assertThat(kda.teamId()).isEqualTo(1L);
+        assertThat(kda.position()).isEqualTo(Position.MID);
+        assertThat(kda.games()).isEqualTo(3L);
+        assertThat(stats.mvps().get(0).teamCode()).isEqualTo("G2");
+        assertThat(stats.mvps().get(0).position()).isEqualTo(Position.MID);
+    }
+
+    @Test
+    void cumuleParPosteAvecLesChampionsLesPlusJoues() {
+        when(gamePlayerRepository.findByGame_Match_Competition_Id(COMPETITION_ID))
+                .thenReturn(List.of(
+                        line(caps, g2, "Azir", 4, 1, 6),
+                        line(humanoid, fnc, "Azir", 2, 3, 5),
+                        line(humanoid, fnc, "Orianna", 1, 1, 1),
+                        line(caps, g2, "Gnar", 3, 2, 1, Position.TOP, null, 1)));
+        when(matchRepository.findByCompetitionIdOrderByDateAscTimeAsc(COMPETITION_ID))
+                .thenReturn(List.of());
+        when(gameRepository.findByMatch_Competition_Id(COMPETITION_ID)).thenReturn(List.of());
+        when(gameBanRepository.findByGame_Match_Competition_Id(COMPETITION_ID)).thenReturn(List.of());
+
+        StatsDto stats = statsService.compute(COMPETITION_ID, null);
+
+        assertThat(stats.positions())
+                .extracting(StatsDto.PositionStat::position)
+                .containsExactly(Position.TOP, Position.MID);
+        StatsDto.PositionStat mid = stats.positions().get(1);
+        assertThat(mid.games()).isEqualTo(3L);
+        assertThat(mid.kills()).isEqualTo(7L);
+        assertThat(mid.topChampions())
+                .extracting(StatsDto.ChampionPick::champion, StatsDto.ChampionPick::picks)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("Azir", 2L),
+                        org.assertj.core.groups.Tuple.tuple("Orianna", 1L));
+        assertThat(stats.champions())
+                .filteredOn(c -> c.champion().equals("Azir"))
+                .first()
+                .extracting(StatsDto.ChampionStat::picksByPosition)
+                .isEqualTo(java.util.Map.of(Position.MID, 2L));
+    }
+
+    private static MatchGamePlayer line(
+            Player player,
+            Team team,
+            String champion,
+            Integer k,
+            Integer d,
+            Integer a,
+            Position position,
+            LocalDate date,
+            int gameNumber) {
+        MatchGamePlayer line = line(player, team, champion, k, d, a);
+        line.setPosition(position);
+        Match match = new Match();
+        match.setDate(date);
+        MatchGame game = new MatchGame();
+        game.setMatch(match);
+        game.setGameNumber(gameNumber);
+        line.setGame(game);
+        return line;
     }
 
     private static MatchGamePlayer line(Player player, Team team, String champion, Integer k, Integer d, Integer a) {

@@ -109,24 +109,28 @@
         <tr v-for="m in sortedMatches" :key="m.id" :class="{ 'row-scheduled': m.status === 'SCHEDULED' }">
           <MatchEditCells v-model="edits[m.id]" :teams="teams" />
           <td class="details-preview">
-            <span v-if="m.team1Champions?.length" class="champ-icons">
-              <img
-                v-for="(c, i) in m.team1Champions"
-                :key="'t1-' + i"
-                :src="championIconUrl(c)"
-                :alt="c"
-                :title="c"
-              />
-            </span>
-            <span v-if="m.team2Champions?.length" class="champ-icons">
-              <img
-                v-for="(c, i) in m.team2Champions"
-                :key="'t2-' + i"
-                :src="championIconUrl(c)"
-                :alt="c"
-                :title="c"
-              />
-            </span>
+            <div v-if="m.team1Champions?.length || m.team2Champions?.length" class="draft" title="Champions de la dernière manche">
+              <div
+                v-for="side in draftSides(m)"
+                :key="side.slot"
+                class="draft-side"
+                :class="{ won: winnerSlot(m) === side.slot, lost: winnerSlot(m) && winnerSlot(m) !== side.slot }"
+              >
+                <span class="draft-team">
+                  <img v-if="teamHasLogo(side.teamId)" :src="teamLogoUrl(side.teamId)" :alt="side.code" />
+                  <span>{{ side.code }}</span>
+                </span>
+                <span class="champ-icons">
+                  <img
+                    v-for="(c, i) in side.champions"
+                    :key="i"
+                    :src="championIconUrl(c)"
+                    :alt="c"
+                    :title="c"
+                  />
+                </span>
+              </div>
+            </div>
             <span v-if="m.mvpPseudo" class="mvp-badge" title="MVP de la série">⭐ {{ m.mvpPseudo }}</span>
           </td>
           <td>
@@ -219,7 +223,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import api from '../services/api'
+import api, { teamLogoUrl } from '../services/api'
 import StandingsTable from '../components/StandingsTable.vue'
 import HeadToHeadTable from '../components/HeadToHeadTable.vue'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
@@ -232,6 +236,7 @@ import StageManager from '../components/StageManager.vue'
 import StatsPanel from '../components/StatsPanel.vue'
 import { splitLabel } from '../formats'
 import { championIconUrl } from '../champions'
+import { winnerSlot } from '../bracketLayout'
 
 const props = defineProps({
   id: { type: [String, Number], required: true }
@@ -247,6 +252,20 @@ const edits = reactive({})
 const stages = ref([])
 const route = useRoute()
 const activeTab = ref('standings')
+
+const teamsWithLogo = computed(() => new Set(teams.value.filter(t => t.hasLogo).map(t => t.id)))
+
+function teamHasLogo(teamId) {
+  return teamsWithLogo.value.has(teamId)
+}
+
+// Apercu compact du calendrier : une ligne par equipe, ses champions dans l'ordre des postes.
+function draftSides(m) {
+  return [
+    { slot: 1, teamId: m.team1Id, code: m.team1Code, champions: m.team1Champions ?? [] },
+    { slot: 2, teamId: m.team2Id, code: m.team2Code, champions: m.team2Champions ?? [] }
+  ]
+}
 
 const playoffMatches = computed(() => matches.value.filter(m => m.phase === 'PLAYOFFS' && !(m.bracketSide ?? '').startsWith('REGIONAL_')))
 const regionalFinalsMatches = computed(() => matches.value.filter(m => (m.bracketSide ?? '').startsWith('REGIONAL_')))
@@ -623,10 +642,43 @@ onMounted(initialLoad)
   white-space: nowrap;
 }
 .details-preview {
+  white-space: nowrap;
+}
+.draft {
+  display: grid;
+  gap: 3px;
+}
+.draft-side {
   display: flex;
   align-items: center;
-  gap: 6px;
-  white-space: nowrap;
+  gap: 8px;
+  padding: 2px 6px 2px 2px;
+  border-radius: 7px;
+  border-left: 3px solid transparent;
+}
+.draft-side.won {
+  border-left-color: var(--accent);
+  background: rgba(129, 140, 248, 0.08);
+}
+.draft-side.lost {
+  opacity: 0.6;
+}
+.draft-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: 64px;
+  font-size: 0.78em;
+  font-weight: 800;
+}
+.draft-team img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+.draft-team span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .champ-icons {
   display: inline-flex;
@@ -639,6 +691,8 @@ onMounted(initialLoad)
   object-fit: cover;
 }
 .mvp-badge {
+  display: inline-block;
+  margin-top: 4px;
   font-size: 0.78em;
   font-weight: 600;
   color: var(--gold-bright);
