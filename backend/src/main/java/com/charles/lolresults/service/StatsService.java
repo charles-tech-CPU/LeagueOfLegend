@@ -211,8 +211,7 @@ public class StatsService {
             tally[1] += orZero(line.getDeaths());
             tally[2] += orZero(line.getAssists());
             tally[3]++;
-            picks.computeIfAbsent(line.getPosition(), pos -> new HashMap<>())
-                    .merge(line.getChampion(), 1L, Long::sum);
+            picks.computeIfAbsent(line.getPosition(), pos -> new HashMap<>()).merge(line.getChampion(), 1L, Long::sum);
         }
         return tallies.entrySet().stream()
                 .map(e -> {
@@ -246,7 +245,8 @@ public class StatsService {
         for (MatchGamePlayer line : lines) {
             Long playerId = line.getPlayer().getId();
             latest.merge(playerId, line, (a, b) -> CHRONOLOGICAL.compare(a, b) >= 0 ? a : b);
-            positions.computeIfAbsent(playerId, id -> new EnumMap<>(Position.class))
+            positions
+                    .computeIfAbsent(playerId, id -> new EnumMap<>(Position.class))
                     .merge(line.getPosition(), 1L, Long::sum);
         }
         Map<Long, Profile> result = new HashMap<>();
