@@ -14,17 +14,22 @@
         <option v-for="o in POSITIONS" :key="o.key" :value="o.key">{{ o.key }}</option>
       </select>
     </label>
-    <label class="transfer-date">
-      à partir du
-      <input v-model="date" type="date" aria-label="Date du transfert" required />
-    </label>
+    <CompetitionDatePicker
+      v-model="date"
+      :team-id="teamId ?? player.teamId"
+      :mode="teamId === null ? 'end' : 'start'"
+      :offset-days="teamId === null ? 1 : 0"
+      label="à partir du"
+      required
+    />
     <button type="submit" :disabled="!date || (!player.teamId && teamId === null) || (roleSwap && position === player.position)">
       {{ teamId === null ? "Retirer de l'équipe" : roleSwap ? 'Valider le changement de poste' : 'Valider le transfert' }}
     </button>
     <button type="button" class="btn-secondary" @click="emit('cancel')">Annuler</button>
     <p class="transfer-hint">
       Le passage chez l'équipe actuelle se termine la veille ; l'historique et les résultats sont conservés.
-      Pour un role swap, garde la même équipe et choisis le nouveau poste.
+      Pour un role swap, garde la même équipe et choisis le nouveau poste. Choisis une compétition pour
+      remplir la date toute seule : le premier match de l'équipe (ou le lendemain du dernier pour un départ).
     </p>
     <p v-if="error" class="error">{{ error }}</p>
   </form>
@@ -35,6 +40,7 @@ import { computed, ref } from 'vue'
 import api from '../services/api'
 import { localIsoDate } from '../format'
 import { POSITIONS } from '../positions'
+import CompetitionDatePicker from './CompetitionDatePicker.vue'
 
 const props = defineProps({
   player: { type: Object, required: true },

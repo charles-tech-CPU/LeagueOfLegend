@@ -140,10 +140,8 @@
         </select>
       </template>
       <template v-if="former">
-        <label class="date-field">Arrivée <input v-model="form.startDate" type="date" aria-label="Date d'arrivée" /></label>
-        <label class="date-field">
-          Départ <input v-model="form.endDate" type="date" aria-label="Date de départ" required />
-        </label>
+        <CompetitionDatePicker v-model="form.startDate" :team-id="id" mode="start" label="Arrivée" />
+        <CompetitionDatePicker v-model="form.endDate" :team-id="id" mode="end" label="Départ" required />
       </template>
       <button type="submit" :disabled="former && !form.endDate">Ajouter</button>
     </form>
@@ -162,6 +160,7 @@ import { POSITIONS } from '../positions'
 import { fullDay } from '../format'
 import CountryFlag from '../components/CountryFlag.vue'
 import CountrySelect from '../components/CountrySelect.vue'
+import CompetitionDatePicker from '../components/CompetitionDatePicker.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
 

@@ -11,4 +11,7 @@ public interface MatchGamePlayerRepository extends JpaRepository<MatchGamePlayer
 
     /** Toutes les lignes de stats des matchs d'une saison, toutes competitions confondues. */
     List<MatchGamePlayer> findByGame_Match_Competition_Season(Integer season);
+
+    /** Toutes les manches saisies d'un joueur (fiche joueur). */
+    List<MatchGamePlayer> findByPlayer_Id(Long playerId);
 }

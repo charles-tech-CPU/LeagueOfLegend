@@ -5,10 +5,12 @@ import com.charles.lolresults.domain.MatchStatus;
 import com.charles.lolresults.dto.CompetitionCreateDto;
 import com.charles.lolresults.dto.CompetitionDto;
 import com.charles.lolresults.dto.SeasonDto;
+import com.charles.lolresults.dto.TeamCompetitionDto;
 import com.charles.lolresults.repository.CompetitionRepository;
 import com.charles.lolresults.repository.MatchRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -64,6 +66,27 @@ public class CompetitionController {
     public List<SeasonDto> seasons() {
         return competitionRepository.countBySeason().stream()
                 .map(row -> new SeasonDto((Integer) row[0], ((Number) row[1]).longValue()))
+                .toList();
+    }
+
+    /**
+     * Competitions jouees par une equipe, de la plus recente a la plus ancienne, avec les dates
+     * de son premier et de son dernier match : pour saisir un passage sans chercher les dates.
+     */
+    @GetMapping("/played-by/{teamId}")
+    public List<TeamCompetitionDto> playedBy(@PathVariable Long teamId) {
+        Map<Long, LocalDate[]> spans = new HashMap<>();
+        for (Object[] row : matchRepository.competitionSpansByTeam(teamId)) {
+            spans.put((Long) row[0], new LocalDate[] {(LocalDate) row[1], (LocalDate) row[2]});
+        }
+        return competitionRepository.findAllById(spans.keySet()).stream()
+                .map(c -> {
+                    LocalDate[] span = spans.get(c.getId());
+                    return new TeamCompetitionDto(
+                            c.getId(), c.getCode(), c.getName(), c.getSeason(), c.getSplit(), span[0], span[1]);
+                })
+                .sorted(Comparator.comparing(TeamCompetitionDto::firstMatchDate, Comparator.reverseOrder())
+                        .thenComparing(TeamCompetitionDto::code))
                 .toList();
     }
 

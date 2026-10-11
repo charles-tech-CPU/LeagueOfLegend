@@ -207,6 +207,81 @@ class StatsServiceTest {
                 .isEqualTo(java.util.Map.of(Position.MID, 2L));
     }
 
+    @Test
+    void calculeVictoiresParticipationAuxKillsEquipesEtRecords() {
+        // Manche 1 gagnee par G2, manche 2 gagnee par FNC.
+        MatchGame game1 = game(g2);
+        MatchGame game2 = game(fnc);
+        Player jankos = player(11L, "Jankos", g2);
+        when(gamePlayerRepository.findByGame_Match_Competition_Id(COMPETITION_ID))
+                .thenReturn(List.of(
+                        inGame(game1, line(caps, g2, "Azir", 6, 0, 1)),
+                        inGame(game1, line(jankos, g2, "Lee Sin", 2, 1, 5)),
+                        inGame(game1, line(humanoid, fnc, "Azir", 1, 4, 0)),
+                        inGame(game2, line(caps, g2, "Azir", 1, 3, 0)),
+                        inGame(game2, line(humanoid, fnc, "Orianna", 9, 1, 3))));
+        when(gameBanRepository.findByGame_Match_Competition_Id(COMPETITION_ID))
+                .thenReturn(List.of(inGame(game1, ban(fnc, "Zed")), inGame(game2, ban(fnc, "Zed"))));
+        when(matchRepository.findByCompetitionIdOrderByDateAscTimeAsc(COMPETITION_ID))
+                .thenReturn(List.of());
+        when(gameRepository.findByMatch_Competition_Id(COMPETITION_ID)).thenReturn(List.of());
+
+        StatsDto stats = statsService.compute(COMPETITION_ID, null);
+
+        assertThat(stats.summary().games()).isEqualTo(2L);
+        assertThat(stats.summary().kills()).isEqualTo(19L);
+        assertThat(stats.summary().championsPicked()).isEqualTo(3L);
+        assertThat(stats.summary().championsPickedOrBanned()).isEqualTo(4L);
+
+        StatsDto.KdaStat capsStat = stats.kda().stream()
+                .filter(k -> k.pseudo().equals("Caps"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(capsStat.wins()).isEqualTo(1L);
+        assertThat(capsStat.losses()).isEqualTo(1L);
+        assertThat(capsStat.perfectGames()).isEqualTo(1L);
+        // (6 + 1) + (1 + 0) sur 8 + 1 kills de G2.
+        assertThat(capsStat.killParticipation()).isEqualTo(8.0 / 9);
+        assertThat(capsStat.topChampions())
+                .extracting(StatsDto.ChampionPick::champion)
+                .containsExactly("Azir");
+
+        StatsDto.ChampionStat azir = stats.champions().stream()
+                .filter(c -> c.champion().equals("Azir"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(azir.wins()).isEqualTo(1L);
+        assertThat(azir.losses()).isEqualTo(2L);
+
+        assertThat(stats.teams()).extracting(StatsDto.TeamStat::teamCode).containsExactly("FNC", "G2");
+        StatsDto.TeamStat fncStat = stats.teams().get(0);
+        assertThat(fncStat.games()).isEqualTo(2L);
+        assertThat(fncStat.wins()).isEqualTo(1L);
+        assertThat(fncStat.kills()).isEqualTo(10L);
+        assertThat(fncStat.mostBanned()).isEqualTo(new StatsDto.ChampionPick("Zed", 2));
+
+        assertThat(stats.records().mostKills().get(0).pseudo()).isEqualTo("Humanoid");
+        assertThat(stats.records().mostAssists().get(0).pseudo()).isEqualTo("Jankos");
+        assertThat(stats.records().bestKda().get(0).pseudo()).isEqualTo("Humanoid");
+    }
+
+    private static MatchGame game(Team winner) {
+        MatchGame game = new MatchGame();
+        game.setWinner(winner);
+        game.setGameNumber(1);
+        return game;
+    }
+
+    private static MatchGamePlayer inGame(MatchGame game, MatchGamePlayer line) {
+        line.setGame(game);
+        return line;
+    }
+
+    private static MatchGameBan inGame(MatchGame game, MatchGameBan ban) {
+        ban.setGame(game);
+        return ban;
+    }
+
     private static MatchGamePlayer line(
             Player player,
             Team team,

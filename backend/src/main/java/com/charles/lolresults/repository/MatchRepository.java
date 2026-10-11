@@ -25,6 +25,14 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     /** Matchs d'une saison, toutes competitions confondues (pour le MVP de serie dans l'onglet Stats). */
     List<Match> findByCompetition_Season(Integer season);
 
+    /** [competitionId, date du premier match, date du dernier match] de chaque competition jouee par l'equipe. */
+    @Query("select m.competition.id, min(m.date), max(m.date) from Match m "
+            + "where m.team1.id = :teamId or m.team2.id = :teamId group by m.competition.id")
+    List<Object[]> competitionSpansByTeam(@Param("teamId") Long teamId);
+
+    /** Series dont le joueur est le MVP (fiche joueur). */
+    List<Match> findByMvp_Id(Long playerId);
+
     /** [competitionId, nombre de matchs, nombre de matchs joues] pour chaque competition d'une saison. */
     @Query("select m.competition.id, count(m), sum(case when m.status = :completed then 1 else 0 end) "
             + "from Match m where m.competition.season = :season group by m.competition.id")

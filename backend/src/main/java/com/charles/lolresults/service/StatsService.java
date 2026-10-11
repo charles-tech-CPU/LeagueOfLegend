@@ -18,21 +18,28 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Statistiques (picks/bans de champions, MVP, K/D/A cumule, cumul par poste) recalculees a la volee a partir
- * des details de match saisis, jamais stockees : meme principe que StandingsService. Le
- * perimetre est une competition, une saison (toutes competitions confondues), ou tout
- * l'historique quand ni l'un ni l'autre n'est precise.
+ * Statistiques (vue d'ensemble, picks/bans et resultats des champions, MVP, K/D/A et champions
+ * de chaque joueur, cumul par poste et par equipe, records sur une manche) recalculees a la
+ * volee a partir des details de match saisis, jamais stockees : meme principe que
+ * StandingsService. Le perimetre est une competition, une saison (toutes competitions
+ * confondues), ou tout l'historique quand ni l'un ni l'autre n'est precise.
  */
 @Service
+@Transactional(readOnly = true)
 public class StatsService {
 
     private static final int TOP_CHAMPIONS_PER_POSITION = 5;
+    private static final int TOP_CHAMPIONS_PER_PLAYER = 3;
+    private static final int RECORDS = 5;
 
     private final MatchRepository matchRepository;
     private final MatchGameRepository gameRepository;
@@ -57,11 +64,18 @@ public class StatsService {
         List<MatchGameBan> bans = bansInScope(competitionId, season);
 
         Map<Long, Profile> profiles = profiles(lines);
+        Map<MatchGame, Map<Long, Long>> teamKills = StatTally.teamKills(lines);
         return new StatsDto(
+                summary(lines, bans),
                 championStats(lines, bans),
                 mvpStats(matches, games, profiles),
-                kdaStats(lines, profiles),
-                positionStats(lines));
+                kdaStats(lines, profiles, teamKills),
+                positionStats(lines),
+                teamStats(lines, bans),
+                new StatsDto.Records(
+                        StatTally.top(lines, StatTally.MOST_KILLS, RECORDS),
+                        StatTally.top(lines, StatTally.MOST_ASSISTS, RECORDS),
+                        StatTally.top(lines, StatTally.BEST_KDA, RECORDS)));
     }
 
     private List<Match> matchesInScope(Long competitionId, Integer season) {
@@ -104,25 +118,59 @@ public class StatsService {
         return gameBanRepository.findAll();
     }
 
+    private StatsDto.Summary summary(List<MatchGamePlayer> lines, List<MatchGameBan> bans) {
+        Set<MatchGame> games = new HashSet<>();
+        Set<String> picked = new HashSet<>();
+        long kills = 0;
+        for (MatchGamePlayer line : lines) {
+            if (line.getGame() != null) {
+                games.add(line.getGame());
+            }
+            picked.add(line.getChampion());
+            kills += orZero(line.getKills());
+        }
+        Set<String> touched = new HashSet<>(picked);
+        for (MatchGameBan ban : bans) {
+            if (ban.getGame() != null) {
+                games.add(ban.getGame());
+            }
+            touched.add(ban.getChampion());
+        }
+        return new StatsDto.Summary(
+                games.size(), kills, (double) kills / Math.max(games.size(), 1), picked.size(), touched.size());
+    }
+
     private List<StatsDto.ChampionStat> championStats(List<MatchGamePlayer> lines, List<MatchGameBan> bans) {
-        Map<String, long[]> byChampion = new LinkedHashMap<>(); // [picks, bans]
+        Map<String, StatTally> byChampion = new LinkedHashMap<>();
+        Map<String, Long> banCounts = new HashMap<>();
         Map<String, Map<Position, Long>> byPosition = new LinkedHashMap<>();
         for (MatchGamePlayer line : lines) {
-            byChampion.computeIfAbsent(line.getChampion(), c -> new long[2])[0]++;
+            byChampion.computeIfAbsent(line.getChampion(), c -> new StatTally()).add(line, 0);
             byPosition
                     .computeIfAbsent(line.getChampion(), c -> new EnumMap<>(Position.class))
                     .merge(line.getPosition(), 1L, Long::sum);
         }
         for (MatchGameBan ban : bans) {
-            byChampion.computeIfAbsent(ban.getChampion(), c -> new long[2])[1]++;
+            byChampion.computeIfAbsent(ban.getChampion(), c -> new StatTally());
+            banCounts.merge(ban.getChampion(), 1L, Long::sum);
         }
         return byChampion.entrySet().stream()
-                .map(e -> new StatsDto.ChampionStat(
-                        e.getKey(),
-                        e.getValue()[0],
-                        e.getValue()[1],
-                        e.getValue()[0] + e.getValue()[1],
-                        byPosition.getOrDefault(e.getKey(), Map.of())))
+                .map(e -> {
+                    StatTally t = e.getValue();
+                    long banned = banCounts.getOrDefault(e.getKey(), 0L);
+                    return new StatsDto.ChampionStat(
+                            e.getKey(),
+                            t.games,
+                            banned,
+                            t.games + banned,
+                            byPosition.getOrDefault(e.getKey(), Map.of()),
+                            t.wins,
+                            t.losses,
+                            t.kills,
+                            t.deaths,
+                            t.assists,
+                            t.ratio());
+                })
                 .sorted(Comparator.comparingLong(StatsDto.ChampionStat::pickAndBan)
                         .reversed())
                 .toList();
@@ -164,26 +212,23 @@ public class StatsService {
                 .toList();
     }
 
-    private List<StatsDto.KdaStat> kdaStats(List<MatchGamePlayer> lines, Map<Long, Profile> profiles) {
-        Map<Long, long[]> byPlayer = new LinkedHashMap<>(); // [kills, deaths, assists, manches]
+    /** Joueurs ayant au moins une manche avec K/D/A saisi ; games compte ces manches-la. */
+    private List<StatsDto.KdaStat> kdaStats(
+            List<MatchGamePlayer> lines, Map<Long, Profile> profiles, Map<MatchGame, Map<Long, Long>> teamKills) {
+        Map<Long, StatTally> byPlayer = new LinkedHashMap<>();
         Map<Long, Player> players = new LinkedHashMap<>();
         for (MatchGamePlayer line : lines) {
-            if (!hasKda(line)) {
-                continue;
-            }
-            long[] tally = byPlayer.computeIfAbsent(line.getPlayer().getId(), id -> new long[4]);
-            tally[0] += orZero(line.getKills());
-            tally[1] += orZero(line.getDeaths());
-            tally[2] += orZero(line.getAssists());
-            tally[3]++;
+            byPlayer.computeIfAbsent(line.getPlayer().getId(), id -> new StatTally())
+                    .add(line, StatTally.teamKillsOf(line, teamKills));
             players.put(line.getPlayer().getId(), line.getPlayer());
         }
         return byPlayer.entrySet().stream()
+                .filter(e -> e.getValue().kdaGames > 0)
                 .map(e -> {
                     Player p = players.get(e.getKey());
                     Profile profile = profiles.getOrDefault(p.getId(), Profile.of(p));
                     Team team = profile.team();
-                    long[] tally = e.getValue();
+                    StatTally t = e.getValue();
                     return new StatsDto.KdaStat(
                             p.getId(),
                             p.getPseudo(),
@@ -191,11 +236,17 @@ public class StatsService {
                             team != null ? team.getCode() : null,
                             team != null && team.getLogo() != null,
                             profile.position(),
-                            tally[3],
-                            tally[0],
-                            tally[1],
-                            tally[2],
-                            ratio(tally[0], tally[1], tally[2]));
+                            t.kdaGames,
+                            t.kills,
+                            t.deaths,
+                            t.assists,
+                            t.ratio(),
+                            t.wins,
+                            t.losses,
+                            t.killParticipation(),
+                            t.perfectGames,
+                            t.champions.size(),
+                            t.topChampions(TOP_CHAMPIONS_PER_PLAYER));
                 })
                 .sorted(Comparator.comparingDouble(StatsDto.KdaStat::ratio).reversed())
                 .toList();
@@ -235,6 +286,76 @@ public class StatsService {
                 .toList();
     }
 
+    /** Cumul par equipe, de la plus victorieuse a la moins victorieuse. */
+    private List<StatsDto.TeamStat> teamStats(List<MatchGamePlayer> lines, List<MatchGameBan> bans) {
+        Map<Long, Team> teams = new LinkedHashMap<>();
+        Map<Long, Set<MatchGame>> games = new HashMap<>();
+        Map<Long, long[]> killsDeaths = new HashMap<>(); // [kills, deaths]
+        Map<Long, Map<String, Long>> picks = new HashMap<>();
+        Map<Long, Map<String, Long>> banned = new HashMap<>();
+        for (MatchGamePlayer line : lines) {
+            Team team = line.getTeam();
+            if (team == null) {
+                continue;
+            }
+            teams.put(team.getId(), team);
+            if (line.getGame() != null) {
+                games.computeIfAbsent(team.getId(), id -> new HashSet<>()).add(line.getGame());
+            }
+            long[] tally = killsDeaths.computeIfAbsent(team.getId(), id -> new long[2]);
+            tally[0] += orZero(line.getKills());
+            tally[1] += orZero(line.getDeaths());
+            picks.computeIfAbsent(team.getId(), id -> new HashMap<>()).merge(line.getChampion(), 1L, Long::sum);
+        }
+        for (MatchGameBan ban : bans) {
+            if (ban.getTeam() != null && teams.containsKey(ban.getTeam().getId())) {
+                banned.computeIfAbsent(ban.getTeam().getId(), id -> new HashMap<>())
+                        .merge(ban.getChampion(), 1L, Long::sum);
+            }
+        }
+        return teams.values().stream()
+                .map(team -> {
+                    Set<MatchGame> played = games.getOrDefault(team.getId(), Set.of());
+                    long wins = played.stream()
+                            .filter(g -> g.getWinner() != null && StatTally.sameTeam(g.getWinner(), team))
+                            .count();
+                    long losses = played.stream()
+                            .filter(g -> g.getWinner() != null && !StatTally.sameTeam(g.getWinner(), team))
+                            .count();
+                    long[] tally = killsDeaths.get(team.getId());
+                    return new StatsDto.TeamStat(
+                            team.getId(),
+                            team.getCode(),
+                            team.getName(),
+                            team.getLogo() != null,
+                            played.size(),
+                            wins,
+                            losses,
+                            tally[0],
+                            tally[1],
+                            (double) tally[0] / Math.max(played.size(), 1),
+                            mostFrequent(picks.get(team.getId())),
+                            mostFrequent(banned.get(team.getId())));
+                })
+                .sorted(Comparator.comparingLong(StatsDto.TeamStat::wins)
+                        .reversed()
+                        .thenComparingLong(StatsDto.TeamStat::losses)
+                        .thenComparing(StatsDto.TeamStat::teamCode, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+    }
+
+    /** Champion le plus frequent ; a egalite, le premier dans l'ordre alphabetique. */
+    private static StatsDto.ChampionPick mostFrequent(Map<String, Long> counts) {
+        if (counts == null) {
+            return null;
+        }
+        return counts.entrySet().stream()
+                .max(Map.Entry.<String, Long>comparingByValue()
+                        .thenComparing(Map.Entry.comparingByKey(Comparator.reverseOrder())))
+                .map(e -> new StatsDto.ChampionPick(e.getKey(), e.getValue()))
+                .orElse(null);
+    }
+
     /**
      * Equipe et poste de chaque joueur dans le perimetre : l'equipe de sa derniere manche
      * saisie (un joueur transfere apparait avec sa derniere equipe), le poste le plus joue.
@@ -263,7 +384,7 @@ public class StatsService {
     }
 
     /** Ordre chronologique des manches : date puis heure du match, puis numero de manche. */
-    private static final Comparator<MatchGamePlayer> CHRONOLOGICAL = Comparator.comparing(
+    static final Comparator<MatchGamePlayer> CHRONOLOGICAL = Comparator.comparing(
                     (MatchGamePlayer l) -> matchOf(l) != null ? matchOf(l).getDate() : null,
                     Comparator.nullsFirst(Comparator.<LocalDate>naturalOrder()))
             .thenComparing(
@@ -284,15 +405,11 @@ public class StatsService {
         }
     }
 
-    private static boolean hasKda(MatchGamePlayer line) {
-        return line.getKills() != null || line.getDeaths() != null || line.getAssists() != null;
-    }
-
     private static double ratio(long kills, long deaths, long assists) {
-        return (double) (kills + assists) / Math.max(deaths, 1);
+        return StatTally.ratio(kills, deaths, assists);
     }
 
     private static long orZero(Integer value) {
-        return value != null ? value : 0;
+        return StatTally.orZero(value);
     }
 }

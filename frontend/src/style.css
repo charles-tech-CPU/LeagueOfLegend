@@ -445,3 +445,17 @@ form.inline {
 nav.topbar .portal-link {
   margin-right: 6px;
 }
+
+/* Couleur d'un ratio K/D/A (voir ratioClass dans statsFormat.js) */
+.ratio-great {
+  color: var(--gold-bright);
+}
+.ratio-good {
+  color: var(--win);
+}
+.ratio-ok {
+  color: var(--text);
+}
+.ratio-low {
+  color: var(--loss);
+}

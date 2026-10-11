@@ -25,6 +25,8 @@ export default {
   getCompetitionsBySeason: (season) => api.get('/competitions', { params: { season } }).then(r => r.data),
   getSeasons: () => api.get('/competitions/seasons').then(r => r.data),
   getCompetition: (id) => api.get(`/competitions/${id}`).then(r => r.data),
+  // Competitions jouees par une equipe, avec les dates de son premier et dernier match (saisie des passages)
+  getTeamCompetitions: (teamId) => api.get(`/competitions/played-by/${teamId}`).then(r => r.data),
   createCompetition: (payload) => api.post('/competitions', payload).then(r => r.data),
   updateCompetition: (id, payload) => api.put(`/competitions/${id}`, payload).then(r => r.data),
 
@@ -62,6 +64,8 @@ export default {
 
   // Historique des equipes d'un joueur (passages), avec les resultats de chaque passage
   getPlayerStints: (playerId) => api.get(`/players/${playerId}/stints`).then(r => r.data),
+  // Stats individuelles (carriere, par competition, saison, champion, adversaire), calculees cote backend
+  getPlayerStats: (playerId) => api.get(`/players/${playerId}/stats`).then(r => r.data),
   addStint: (playerId, payload) => api.post(`/players/${playerId}/stints`, payload).then(r => r.data),
   updateStint: (id, payload) => api.put(`/stints/${id}`, payload).then(r => r.data),
   deleteStint: (id) => api.delete(`/stints/${id}`),

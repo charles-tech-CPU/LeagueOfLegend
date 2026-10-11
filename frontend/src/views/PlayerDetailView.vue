@@ -31,13 +31,44 @@
         <span class="stat-value">{{ career.teams }}</span>
         <span class="stat-label">{{ career.teams > 1 ? 'équipes' : 'équipe' }}</span>
       </div>
+      <div v-if="stats?.career.kdaGames" class="stat kda-stat">
+        <span class="stat-value" :class="ratioClass(stats.career.ratio)">{{ kdaRatio(stats.career.ratio) }}</span>
+        <span class="stat-label">KDA carrière · {{ averageKda(stats.career) }}</span>
+      </div>
+      <div v-if="stats?.champions.length" class="stat">
+        <span class="stat-value hero-champs">
+          <img
+            v-for="ch in stats.champions.slice(0, 3)"
+            :key="ch.champion"
+            :src="championIconUrl(ch.champion)"
+            :alt="ch.champion"
+            :title="`${ch.champion} : ${ch.stats.games} manche(s)`"
+          />
+        </span>
+        <span class="stat-label">champions favoris</span>
+      </div>
     </div>
   </header>
 
   <div v-if="player" class="toolbar">
     <div class="tabs" role="tablist">
-      <button type="button" role="tab" aria-selected="true" class="active">
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="tab === 'career'"
+        :class="{ active: tab === 'career' }"
+        @click="tab = 'career'"
+      >
         <span class="tab-icon">🧭</span>Parcours
+      </button>
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="tab === 'stats'"
+        :class="{ active: tab === 'stats' }"
+        @click="tab = 'stats'"
+      >
+        <span class="tab-icon">📈</span>Statistiques
       </button>
     </div>
     <button v-if="!transferring" type="button" class="btn-secondary" @click="transferring = true">
@@ -53,7 +84,11 @@
     @cancel="transferring = false"
   />
 
-  <section class="tab-panel">
+  <section v-if="tab === 'stats'" class="tab-panel">
+    <PlayerStatsPanel v-if="stats" :stats="stats" />
+  </section>
+
+  <section v-else class="tab-panel">
     <p class="hint">
       Les résultats d'un passage sont ceux de <strong>l'équipe pendant la période</strong> : on considère que le joueur a
       joué tous ses matchs. Une date d'arrivée inconnue compte tous les matchs de l'équipe jusqu'au départ.
@@ -81,10 +116,15 @@
             <select v-model="stintForm.position" aria-label="Poste">
               <option v-for="o in POSITIONS" :key="o.key" :value="o.key">{{ o.key }}</option>
             </select>
-            <label>Arrivée <input v-model="stintForm.startDate" type="date" aria-label="Date d'arrivée" /></label>
-            <label v-if="!s.current">
-              Départ <input v-model="stintForm.endDate" type="date" aria-label="Date de départ" required />
-            </label>
+            <CompetitionDatePicker v-model="stintForm.startDate" :team-id="stintForm.teamId" mode="start" label="Arrivée" />
+            <CompetitionDatePicker
+              v-if="!s.current"
+              v-model="stintForm.endDate"
+              :team-id="stintForm.teamId"
+              mode="end"
+              label="Départ"
+              required
+            />
             <button type="submit">Enregistrer</button>
             <button type="button" class="btn-secondary" @click="editingId = null">Annuler</button>
           </form>
@@ -190,12 +230,14 @@
         <option :value="null">Poste actuel</option>
         <option v-for="o in POSITIONS" :key="o.key" :value="o.key">{{ o.key }}</option>
       </select>
-      <label class="date-field">Arrivée <input v-model="newStint.startDate" type="date" aria-label="Date d'arrivée" /></label>
-      <label class="date-field">
-        Départ <input v-model="newStint.endDate" type="date" aria-label="Date de départ" required />
-      </label>
+      <CompetitionDatePicker v-model="newStint.startDate" :team-id="newStint.teamId" mode="start" label="Arrivée" />
+      <CompetitionDatePicker v-model="newStint.endDate" :team-id="newStint.teamId" mode="end" label="Départ" required />
       <button type="submit" :disabled="!newStint.teamId || !newStint.endDate">Ajouter</button>
     </form>
+    <p class="muted form-hint">
+      Choisis l'équipe, puis une compétition qu'elle a jouée : l'arrivée prend la date de son premier match,
+      le départ celle de son dernier. Tu peux toujours corriger la date à la main.
+    </p>
   </section>
 
   <p v-if="error" class="error">{{ error }}</p>
@@ -209,11 +251,18 @@ import { countryName, isKnownCountry } from '../countries'
 import { leagueColor } from '../leagueColors'
 import { fullDay } from '../format'
 import TransferForm from '../components/TransferForm.vue'
+import CompetitionDatePicker from '../components/CompetitionDatePicker.vue'
+import PlayerStatsPanel from '../components/PlayerStatsPanel.vue'
+import { championIconUrl } from '../champions'
+import { averageKda, kdaRatio, ratioClass } from '../statsFormat'
 
 const props = defineProps({ id: { type: String, required: true } })
 
 const player = ref(null)
 const stints = ref([])
+const stats = ref(null)
+// Onglet affiche : 'career' (parcours) ou 'stats'
+const tab = ref('career')
 const teams = ref([])
 const loaded = ref(false)
 const error = ref('')
@@ -265,10 +314,16 @@ function opponent(stint, match) {
 async function load() {
   error.value = ''
   try {
-    const [p, s, t] = await Promise.all([api.getPlayer(props.id), api.getPlayerStints(props.id), api.getTeams()])
+    const [p, s, t, st] = await Promise.all([
+      api.getPlayer(props.id),
+      api.getPlayerStints(props.id),
+      api.getTeams(),
+      api.getPlayerStats(props.id)
+    ])
     player.value = p
     stints.value = s
     teams.value = t
+    stats.value = st
   } catch (e) {
     error.value = apiError(e, 'Impossible de charger le joueur.')
   }
@@ -468,6 +523,24 @@ watch(() => props.id, load)
   color: #0a0c18;
   background: var(--accent-grad);
   box-shadow: 0 6px 18px -8px rgba(129, 140, 248, 0.9);
+}
+.kda-stat {
+  border-color: rgba(129, 140, 248, 0.45);
+  background: rgba(129, 140, 248, 0.08);
+}
+.hero-champs {
+  display: inline-flex;
+  gap: 4px;
+}
+.hero-champs img {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+.form-hint {
+  font-size: 0.82em;
+  margin: 8px 0 0;
 }
 .transfer-panel {
   margin-bottom: 22px;

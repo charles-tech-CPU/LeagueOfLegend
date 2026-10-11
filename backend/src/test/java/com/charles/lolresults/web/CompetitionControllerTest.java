@@ -52,6 +52,22 @@ class CompetitionControllerTest {
     }
 
     @Test
+    void competitionsJoueesParUneEquipeAvecLeursDatesDeLaPlusRecente() throws Exception {
+        when(matchRepository.competitionSpansByTeam(7L))
+                .thenReturn(List.of(
+                        new Object[] {1L, java.time.LocalDate.of(2024, 1, 10), java.time.LocalDate.of(2024, 4, 14)},
+                        new Object[] {2L, java.time.LocalDate.of(2024, 6, 1), java.time.LocalDate.of(2024, 9, 8)}));
+        when(competitionRepository.findAllById(any()))
+                .thenReturn(List.of(competition(1L, "LEC", 2024), competition(2L, "LEC", 2024)));
+
+        mockMvc.perform(get("/api/competitions/played-by/7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].competitionId", contains(2, 1)))
+                .andExpect(jsonPath("$[0].firstMatchDate").value("2024-06-01"))
+                .andExpect(jsonPath("$[0].lastMatchDate").value("2024-09-08"));
+    }
+
+    @Test
     void uneSaisonEstRangeeParSplitPuisEvenementsAvecSonAvancement() throws Exception {
         Competition summer = competition(1L, "LCS", 2013);
         summer.setSplit(CompetitionSplit.SUMMER);
