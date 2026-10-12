@@ -115,8 +115,9 @@ public class MatchDetailsService {
             if (!players.add(l.playerId())) {
                 throw new IllegalArgumentException(label + "un joueur est saisi deux fois");
             }
-            if (!champions.add(champion.toLowerCase(Locale.ROOT))) {
-                throw new IllegalArgumentException(label + champion + " est choisi deux fois");
+            // Par equipe : un pick miroir est possible en blind pick (5e manche des Bo5 OGN).
+            if (!champions.add(team.getId() + ":" + champion.toLowerCase(Locale.ROOT))) {
+                throw new IllegalArgumentException(label + champion + " est choisi deux fois par " + team.getCode());
             }
             if (!positions.add(l.position())) {
                 throw new IllegalArgumentException(

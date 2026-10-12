@@ -146,20 +146,38 @@ class MatchDetailsServiceTest {
     }
 
     @Test
-    void refuseUnChampionChoisiDeuxFois() {
+    void refuseUnChampionChoisiDeuxFoisParLaMemeEquipe() {
         Game game = new Game(
                 1,
                 null,
                 null,
                 List.of(
                         new Line(10L, 1L, Position.MID, "Ahri", null, null, null),
-                        new Line(20L, 2L, Position.MID, "ahri", null, null, null)),
+                        new Line(11L, 1L, Position.TOP, "ahri", null, null, null)),
                 List.of());
 
         assertThatThrownBy(() -> service.replace(5L, new MatchDetailsUpdateDto(null, List.of(game))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("choisi deux fois");
         verify(gameRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void accepteUnPickMiroirEntreLesDeuxEquipes() {
+        Game game = new Game(
+                1,
+                null,
+                null,
+                List.of(
+                        new Line(10L, 1L, Position.MID, "Ahri", null, null, null),
+                        new Line(20L, 2L, Position.MID, "Ahri", null, null, null)),
+                List.of());
+
+        MatchDetailsDto dto = service.replace(5L, new MatchDetailsUpdateDto(null, List.of(game)));
+
+        assertThat(dto.games().get(0).players())
+                .extracting(MatchDetailsDto.Line::champion)
+                .containsExactly("Ahri", "Ahri");
     }
 
     @Test

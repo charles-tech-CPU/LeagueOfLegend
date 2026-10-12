@@ -398,6 +398,28 @@ class SeasonPlan:
             })
         self.unmatched_db = [m for m in self.db.matches if m["id"] not in used]
 
+    def board_fits(self, serie, board):
+        """Au moins une des equipes de la feuille de match joue la serie."""
+        ids = {self.teams.id(board["Team1"]), self.teams.id(board["Team2"])}
+        if ids & {serie["team1_id"], serie["team2_id"]}:
+            return True
+        return any(self.team_in(serie, board[k]) for k in ("Team1", "Team2"))
+
+    def game_teams(self, serie, board, rows):
+        """
+        Equipes d'une manche : par leur nom, sinon par elimination (une manche oppose les deux
+        equipes de la serie, ex: "Counter Logic Gaming" sur la feuille, "CLG Prime" au calendrier).
+        """
+        names = {board["Team1"], board["Team2"]} | {r["Team"] for r in rows}
+        names.discard("")
+        team_of = {n: self.team_in(serie, n) for n in names}
+        both = {serie["team1_id"], serie["team2_id"]}
+        unknown = [n for n, tid in team_of.items() if tid is None]
+        found = {tid for tid in team_of.values() if tid}
+        if len(unknown) == 1 and len(found) == 1 and len(both - found) == 1:
+            team_of[unknown[0]] = next(iter(both - found))
+        return team_of
+
     def sched_winner(self, serie, sched):
         if sched["Winner"] not in ("1", "2"):
             return None
@@ -423,7 +445,9 @@ class SeasonPlan:
         boards_of = defaultdict(list)  # MatchId (du calendrier) -> feuilles de match
         orphans = defaultdict(list)
         for g in s.games:
-            (boards_of if g["MatchId"] in by_match else orphans)[g["MatchId"]].append(g)
+            # Feuille rattachee a une serie dont aucune equipe ne joue (identifiants decales) : orpheline.
+            mine = g["MatchId"] in by_match and self.board_fits(by_match[g["MatchId"]], g)
+            (boards_of if mine else orphans)[g["MatchId"]].append(g)
         # Feuilles dont l'identifiant de serie differe du calendrier (vieilles pages) :
         # rattachees a la serie de la meme page, memes equipes, a un jour pres.
         for gid, rows in sorted(orphans.items(), key=lambda kv: min(r["DateTime_UTC"] for r in kv[1])):
@@ -455,12 +479,13 @@ class SeasonPlan:
 
         for match_id, serie in by_match.items():
             scheds = sorted(planned[match_id], key=lambda g: to_int(g["N_GameInMatch"]))
-            linked = {g["GameId"] for g in scheds}
+            linked = {g["GameId"] for g in scheds if g["GameId"] in boards
+                      and self.board_fits(serie, boards[g["GameId"]])}
             free = sorted((b for b in boards_of[match_id] if b["GameId"] not in linked),
                           key=lambda b: (to_int(b["N_GameInMatch"]) or 0, b["DateTime_UTC"]))
             pairs = []
             for sched in scheds:
-                board = boards.get(sched["GameId"])
+                board = boards.get(sched["GameId"]) if sched["GameId"] in linked else None
                 if board is None and not sched["FF"] and free:
                     candidate = free[0]
                     sched_winner = self.sched_winner(serie, sched)
@@ -482,8 +507,9 @@ class SeasonPlan:
                         "ff": bool(sched and sched["FF"]), "players": [], "bans": [],
                         "id": (board or sched)["GameId"]}
                 if board:
+                    team_of = self.game_teams(serie, board, players.get(board["GameId"], []))
                     for side, col in ((board["Team1"], "Team1Bans"), (board["Team2"], "Team2Bans")):
-                        tid = self.team_in(serie, side)
+                        tid = team_of.get(side)
                         for champ in parse_bans(board[col]):
                             if champ in self.champions and tid and (tid, champ) not in game["bans"]:
                                 game["bans"].append((tid, champ))
@@ -492,17 +518,18 @@ class SeasonPlan:
                     seen_champ, seen_player = set(), set()
                     for p in players.get(board["GameId"], []):
                         page = s.page_of.get(p["Link"])
-                        tid = self.team_in(serie, p["Team"])
+                        tid = team_of.get(p["Team"])
                         pos = role_of(p)
                         champ = p["Champion"]
                         if not page or not tid or not pos or champ not in self.champions:
                             self.issue(f"ligne joueur ignoree : {p['Link']} / {p['Team']} / {p['Role']} / "
                                        f"{champ} ({board['GameId']})")
                             continue
-                        if champ in seen_champ or page in seen_player:
-                            self.issue(f"doublon ignore : {p['Link']} {champ} ({board['GameId']})")
-                            continue
-                        seen_champ.add(champ)
+                        if (tid, champ) in seen_champ or page in seen_player:
+                            if (tid, champ) not in seen_champ or page not in seen_player:
+                                self.issue(f"doublon ignore : {p['Link']} {champ} ({board['GameId']})")
+                            continue  # ligne en double dans Leaguepedia
+                        seen_champ.add((tid, champ))
                         seen_player.add(page)
                         game["players"].append({"page": page, "team": tid, "pos": pos, "champ": champ,
                                                 "k": to_int(p["Kills"]), "d": to_int(p["Deaths"]),
