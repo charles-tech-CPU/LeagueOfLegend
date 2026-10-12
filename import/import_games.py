@@ -749,8 +749,8 @@ class Import:
         for t in self.tenures.get(page, []):
             tid = self.teams.id(t["Team"]) if t["Team"] else None
             start, leave = day(t["DateJoin"]), day(t["DateLeave"])
-            if tid is None or start is None:
-                continue
+            if tid is None or start is None or (leave is not None and leave <= start):
+                continue  # equipe hors base, ou contrat vide (arrivee et depart le meme jour)
             roles = self.join_roles.get((page, t["Team"], t["DateJoin"][:10]))
             playing = [ROLES[r.lower()] for r in roles or [] if r.lower() in ROLES]
             if roles and not playing:
@@ -818,7 +818,8 @@ class Import:
                         e = runs[i + 1]["first"] - timedelta(days=1)
                     else:
                         e = None if current else end - timedelta(days=1)
-                    result.append({"page": page, "team": tid, "pos": run["pos"], "start": s, "end": e})
+                    if e is None or e >= s:
+                        result.append({"page": page, "team": tid, "pos": run["pos"], "start": s, "end": e})
             # Contrats successifs dans la meme equipe au meme poste (renouvellement) : un seul passage.
             merged = []
             for st in sorted(result, key=lambda st: st["start"]):
