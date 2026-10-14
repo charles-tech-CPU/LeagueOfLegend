@@ -75,48 +75,6 @@
 
     <div class="stats-grid">
       <section class="stats-block">
-        <h3>Champions<span v-if="position" class="muted small"> · picks en {{ position }}</span></h3>
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Champion</th>
-                <th class="num">Picks</th>
-                <th v-if="!position" class="num">Bans</th>
-                <th v-if="!position" class="num">Pick + Ban</th>
-                <th v-if="!position" class="num" title="Part des manches où le champion est pické ou banni">Présence</th>
-                <th v-if="!position" class="num">V-D</th>
-                <th v-if="!position" class="num">% V</th>
-                <th v-if="!position" class="num">KDA</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="c in championRows" :key="c.champion">
-                <td class="champion-cell">
-                  <img v-if="championIconUrl(c.champion)" :src="championIconUrl(c.champion)" :alt="c.champion" />
-                  {{ c.champion }}
-                </td>
-                <td class="num" :class="{ strong: position }">{{ c.picks }}</td>
-                <td v-if="!position" class="num">{{ c.bans }}</td>
-                <td v-if="!position" class="num strong">{{ c.pickAndBan }}</td>
-                <td v-if="!position" class="num">{{ presence(c) }}</td>
-                <td v-if="!position" class="num">
-                  <template v-if="c.wins + c.losses">
-                    <span class="win">{{ c.wins }}</span>-<span class="loss">{{ c.losses }}</span>
-                  </template>
-                  <template v-else>—</template>
-                </td>
-                <td v-if="!position" class="num">{{ winRate(c) ?? '—' }}</td>
-                <td v-if="!position" class="num" :class="hasKda(c) ? ratioClass(c.ratio) : ''">
-                  {{ hasKda(c) ? kdaRatio(c.ratio) : '—' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="stats-block">
         <h3>MVP</h3>
         <div class="table-scroll">
           <table>
@@ -190,6 +148,48 @@
                       +{{ p.championCount - p.topChampions.length }}
                     </span>
                   </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="stats-block">
+        <h3>Champions<span v-if="position" class="muted small"> · picks en {{ position }}</span></h3>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Champion</th>
+                <th class="num">Picks</th>
+                <th v-if="!position" class="num">Bans</th>
+                <th v-if="!position" class="num">Pick + Ban</th>
+                <th v-if="!position" class="num" title="Part des manches où le champion est pické ou banni">Présence</th>
+                <th v-if="!position" class="num">V-D</th>
+                <th v-if="!position" class="num">% V</th>
+                <th v-if="!position" class="num">KDA</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in championRows" :key="c.champion">
+                <td class="champion-cell">
+                  <img v-if="championIconUrl(c.champion)" :src="championIconUrl(c.champion)" :alt="c.champion" />
+                  {{ c.champion }}
+                </td>
+                <td class="num" :class="{ strong: position }">{{ c.picks }}</td>
+                <td v-if="!position" class="num">{{ c.bans }}</td>
+                <td v-if="!position" class="num strong">{{ c.pickAndBan }}</td>
+                <td v-if="!position" class="num">{{ presence(c) }}</td>
+                <td v-if="!position" class="num">
+                  <template v-if="c.wins + c.losses">
+                    <span class="win">{{ c.wins }}</span>-<span class="loss">{{ c.losses }}</span>
+                  </template>
+                  <template v-else>—</template>
+                </td>
+                <td v-if="!position" class="num">{{ winRate(c) ?? '—' }}</td>
+                <td v-if="!position" class="num" :class="hasKda(c) ? ratioClass(c.ratio) : ''">
+                  {{ hasKda(c) ? kdaRatio(c.ratio) : '—' }}
                 </td>
               </tr>
             </tbody>

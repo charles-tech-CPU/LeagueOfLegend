@@ -88,7 +88,7 @@
 
   <section v-if="activeTab === 'calendar'" class="tab-panel">
     <div class="table-scroll full-bleed">
-    <table v-if="sortedMatches.length">
+    <table v-if="sortedMatches.length" class="calendar-table">
       <thead>
         <tr>
           <th class="sortable" tabindex="0" @click="toggleSort('date')" @keydown.enter="toggleSort('date')">Date <span class="sort-arrow">{{ sortArrow('date') }}</span></th>
@@ -640,6 +640,29 @@ onMounted(initialLoad)
 }
 .row-actions {
   white-space: nowrap;
+}
+/* Colonne d'actions collee a droite : Enregistrer / Details restent visibles
+   quand la fenetre est etroite, sans devoir defiler horizontalement (la barre
+   de defilement est tout en bas d'un long calendrier). overflow: clip (et non
+   hidden) pour que le sticky s'accroche a .table-scroll et pas a la table. */
+.calendar-table {
+  overflow: clip;
+}
+.calendar-table th:last-child,
+.calendar-table .row-actions {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  box-shadow: -10px 0 12px -10px rgba(0, 0, 0, 0.7);
+}
+.calendar-table th:last-child {
+  background: var(--panel-alt);
+}
+.calendar-table .row-actions {
+  background: var(--panel);
+}
+.calendar-table tbody tr:hover .row-actions {
+  background: var(--panel-hover);
 }
 .details-preview {
   white-space: nowrap;
