@@ -1193,7 +1193,7 @@ def emit_sql(year):
     for f in rows["fixes"]:
         targets.setdefault(f["match_id"], None)
     w("")
-    w("-- Series : retrouvees par competition, date et heure (verification), puis completees.")
+    w("-- Series : retrouvees par identifiant et competition, puis completees.")
     w("CREATE TEMP TABLE lp_series (match_id BIGINT PRIMARY KEY, source_key TEXT NOT NULL, date DATE NOT NULL, "
       "time TIME, team1_id BIGINT, team2_id BIGINT, score1 INT, score2 INT, mvp TEXT);")
     series_rows = []
@@ -1204,9 +1204,14 @@ def emit_sql(year):
     if series_rows:
         values(w, "lp_series", ["match_id", "source_key", "date", "time", "team1_id", "team2_id", "score1",
                                 "score2", "mvp"], series_rows)
-    check(w, "(SELECT count(*) FROM lp_series s JOIN match m ON m.id = s.match_id AND m.date = s.date "
-             "AND m.time IS NOT DISTINCT FROM s.time JOIN competition c ON c.id = m.competition_id "
-             "AND c.source_key = s.source_key) = (SELECT count(*) FROM lp_series)", "match introuvable")
+    # La base cible a pu changer depuis la generation (match supprime, saisi autrement) : ces series
+    # sont ignorees, avec leurs manches, plutot que d'arreter la migration. Un match deplace (date,
+    # heure) reste le meme match.
+    w("-- Series dont le match a disparu ou n'oppose plus les memes equipes : ignorees.")
+    w("DELETE FROM lp_series s WHERE NOT EXISTS (SELECT 1 FROM match m JOIN competition c ON c.id = m.competition_id "
+      "WHERE m.id = s.match_id AND c.source_key = s.source_key "
+      "AND (m.team1_id IS NULL OR s.team1_id IS NULL OR m.team1_id = s.team1_id) "
+      "AND (m.team2_id IS NULL OR s.team2_id IS NULL OR m.team2_id = s.team2_id));")
     w("UPDATE match m SET team1_id = coalesce(m.team1_id, s.team1_id), team2_id = coalesce(m.team2_id, s.team2_id), "
       "score1 = s.score1, score2 = s.score2, status = 'COMPLETED' "
       "FROM lp_series s WHERE m.id = s.match_id AND m.score1 IS NULL AND s.score1 IS NOT NULL;")
@@ -1223,6 +1228,7 @@ def emit_sql(year):
           "mvp TEXT, PRIMARY KEY (match_id, game_number));")
         values(w, "lp_game", ["match_id", "game_number", "winner_team_id", "mvp"],
                [(g["match_id"], g["n"], g["winner"], g["mvp"]) for g in rows["games"]])
+        w("DELETE FROM lp_game WHERE match_id NOT IN (SELECT match_id FROM lp_series);")
         w("INSERT INTO match_game (match_id, game_number, winner_team_id, mvp_player_id) "
           "SELECT g.match_id, g.game_number, g.winner_team_id, p.id FROM lp_game g "
           "LEFT JOIN player p ON p.source_key = g.mvp WHERE NOT EXISTS "
@@ -1241,6 +1247,10 @@ def emit_sql(year):
                                      "kills", "deaths", "assists"],
                [(p["match_id"], p["n"], p["player"], p["team"], p["pos"], p["champ"], p["k"], p["d"], p["a"])
                 for p in rows["game_players"]])
+        # Manches ignorees (serie ecartee) ou deja renseignees dans la base cible : rien a importer.
+        w("DELETE FROM lp_game_player l WHERE l.match_id NOT IN (SELECT match_id FROM lp_series) OR EXISTS "
+          "(SELECT 1 FROM match_game x JOIN match_game_player y ON y.game_id = x.id "
+          "WHERE x.match_id = l.match_id AND x.game_number = l.game_number);")
         w("INSERT INTO match_game_player (game_id, player_id, team_id, position, champion, kills, deaths, assists) "
           "SELECT x.id, p.id, l.team_id, l.position, l.champion, l.kills, l.deaths, l.assists FROM lp_game_player l "
           "JOIN match_game x ON x.match_id = l.match_id AND x.game_number = l.game_number "
@@ -1258,6 +1268,7 @@ def emit_sql(year):
           "champion TEXT NOT NULL);")
         values(w, "lp_ban", ["match_id", "game_number", "team_id", "champion"],
                [(b["match_id"], b["n"], b["team"], b["champ"]) for b in rows["bans"]])
+        w("DELETE FROM lp_ban WHERE match_id NOT IN (SELECT match_id FROM lp_series);")
         w("INSERT INTO match_game_ban (game_id, team_id, champion) "
           "SELECT x.id, l.team_id, l.champion FROM lp_ban l "
           "JOIN match_game x ON x.match_id = l.match_id AND x.game_number = l.game_number "
@@ -1271,7 +1282,8 @@ def emit_sql(year):
             w(f"UPDATE match_game_player SET player_id = (SELECT id FROM player WHERE source_key = {sql(f['player'])}), "
               f"champion = {sql(f['champ'])}, kills = {sql(f['k'])}, deaths = {sql(f['d'])}, "
               f"assists = {sql(f['a'])} WHERE game_id = {game} AND team_id = {f['team']} "
-              f"AND position = {sql(f['pos'])} AND champion = {sql(f['old_champ'])};")
+              f"AND position = {sql(f['pos'])} AND champion = {sql(f['old_champ'])} "
+              f"AND EXISTS (SELECT 1 FROM lp_series WHERE match_id = {f['match_id']});")
     w("")
     w("DROP TABLE lp_series;")
     if team_ids:

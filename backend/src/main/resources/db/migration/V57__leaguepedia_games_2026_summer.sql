@@ -880,7 +880,7 @@ DROP TABLE lp_stint;
 -- Equipe actuelle = celle du passage en cours (aucune pour un joueur sans contrat).
 UPDATE player p SET team_id = (SELECT s.team_id FROM player_stint s WHERE s.player_id = p.id AND s.end_date IS NULL) FROM lp_player l WHERE p.source_key = l.source_key;
 
--- Series : retrouvees par competition, date et heure (verification), puis completees.
+-- Series : retrouvees par identifiant et competition, puis completees.
 CREATE TEMP TABLE lp_series (match_id BIGINT PRIMARY KEY, source_key TEXT NOT NULL, date DATE NOT NULL, time TIME, team1_id BIGINT, team2_id BIGINT, score1 INT, score2 INT, mvp TEXT);
 INSERT INTO lp_series (match_id, source_key, date, time, team1_id, team2_id, score1, score2, mvp) VALUES
     (1, 'leaguepedia:LPL/2026 Season/Split 3', '2026-07-22', '11:00:00', 31, 13, 2, 0, 'leaguepedia:Tangyuan'),
@@ -2053,7 +2053,8 @@ INSERT INTO lp_series (match_id, source_key, date, time, team1_id, team2_id, sco
     (24554, 'leaguepedia:2026 Mid-Season Invitational', '2026-07-12', '09:30:00', NULL, NULL, NULL, NULL, NULL),
     (24555, 'leaguepedia:2026 Demacia Cup Global Invitational', '2026-10-08', '11:00:00', NULL, NULL, NULL, NULL, NULL),
     (24556, 'leaguepedia:2026 Demacia Cup Global Invitational', '2026-10-08', '13:00:00', NULL, NULL, NULL, NULL, NULL);
-SELECT ('ERREUR import Leaguepedia : match introuvable ' || c.ok::text)::int FROM (SELECT ((SELECT count(*) FROM lp_series s JOIN match m ON m.id = s.match_id AND m.date = s.date AND m.time IS NOT DISTINCT FROM s.time JOIN competition c ON c.id = m.competition_id AND c.source_key = s.source_key) = (SELECT count(*) FROM lp_series)) AS ok) c WHERE NOT c.ok;
+-- Series dont le match a disparu ou n'oppose plus les memes equipes : ignorees.
+DELETE FROM lp_series s WHERE NOT EXISTS (SELECT 1 FROM match m JOIN competition c ON c.id = m.competition_id WHERE m.id = s.match_id AND c.source_key = s.source_key AND (m.team1_id IS NULL OR s.team1_id IS NULL OR m.team1_id = s.team1_id) AND (m.team2_id IS NULL OR s.team2_id IS NULL OR m.team2_id = s.team2_id));
 UPDATE match m SET team1_id = coalesce(m.team1_id, s.team1_id), team2_id = coalesce(m.team2_id, s.team2_id), score1 = s.score1, score2 = s.score2, status = 'COMPLETED' FROM lp_series s WHERE m.id = s.match_id AND m.score1 IS NULL AND s.score1 IS NOT NULL;
 UPDATE match m SET team1_id = coalesce(m.team1_id, s.team1_id), team2_id = coalesce(m.team2_id, s.team2_id) FROM lp_series s WHERE m.id = s.match_id AND (m.team1_id IS NULL OR m.team2_id IS NULL);
 UPDATE match m SET mvp_player_id = p.id FROM lp_series s JOIN player p ON p.source_key = s.mvp WHERE m.id = s.match_id AND m.mvp_player_id IS NULL;
@@ -4932,6 +4933,7 @@ INSERT INTO lp_game (match_id, game_number, winner_team_id, mvp) VALUES
     (303, 3, 2, 'leaguepedia:Raptor (Jeon Eo-jin)'),
     (303, 4, 2, 'leaguepedia:Raptor (Jeon Eo-jin)'),
     (505, 1, 70, NULL);
+DELETE FROM lp_game WHERE match_id NOT IN (SELECT match_id FROM lp_series);
 INSERT INTO match_game (match_id, game_number, winner_team_id, mvp_player_id) SELECT g.match_id, g.game_number, g.winner_team_id, p.id FROM lp_game g LEFT JOIN player p ON p.source_key = g.mvp WHERE NOT EXISTS (SELECT 1 FROM match_game x WHERE x.match_id = g.match_id AND x.game_number = g.game_number);
 UPDATE match_game x SET winner_team_id = coalesce(x.winner_team_id, g.winner_team_id), mvp_player_id = coalesce(x.mvp_player_id, p.id) FROM lp_game g LEFT JOIN player p ON p.source_key = g.mvp WHERE x.match_id = g.match_id AND x.game_number = g.game_number;
 DROP TABLE lp_game;
@@ -16632,6 +16634,7 @@ INSERT INTO lp_game_player (match_id, game_number, player, team_id, position, ch
     (303, 4, 'leaguepedia:Raptor (Jeon Eo-jin)', 2, 'JGL', 'Vi', 8, 4, 10),
     (303, 4, 'leaguepedia:Taeyoon (Kim Tae-yoon)', 2, 'ADC', 'Ziggs', 5, 1, 13),
     (303, 4, 'leaguepedia:VicLa', 2, 'MID', 'Viktor', 4, 2, 9);
+DELETE FROM lp_game_player l WHERE l.match_id NOT IN (SELECT match_id FROM lp_series) OR EXISTS (SELECT 1 FROM match_game x JOIN match_game_player y ON y.game_id = x.id WHERE x.match_id = l.match_id AND x.game_number = l.game_number);
 INSERT INTO match_game_player (game_id, player_id, team_id, position, champion, kills, deaths, assists) SELECT x.id, p.id, l.team_id, l.position, l.champion, l.kills, l.deaths, l.assists FROM lp_game_player l JOIN match_game x ON x.match_id = l.match_id AND x.game_number = l.game_number JOIN player p ON p.source_key = l.player WHERE NOT EXISTS (SELECT 1 FROM match_game_player y WHERE y.game_id = x.id);
 SELECT ('ERREUR import Leaguepedia : ligne joueur non importee ' || c.ok::text)::int FROM (SELECT ((SELECT count(*) FROM lp_game_player l JOIN match_game x ON x.match_id = l.match_id AND x.game_number = l.game_number JOIN player p ON p.source_key = l.player JOIN match_game_player y ON y.game_id = x.id AND y.player_id = p.id) = (SELECT count(*) FROM lp_game_player)) AS ok) c WHERE NOT c.ok;
 DROP TABLE lp_game_player;
@@ -28328,6 +28331,7 @@ INSERT INTO lp_ban (match_id, game_number, team_id, champion) VALUES
     (303, 4, 29, 'Lucian'),
     (303, 4, 29, 'Ambessa'),
     (303, 4, 29, 'Twisted Fate');
+DELETE FROM lp_ban WHERE match_id NOT IN (SELECT match_id FROM lp_series);
 INSERT INTO match_game_ban (game_id, team_id, champion) SELECT x.id, l.team_id, l.champion FROM lp_ban l JOIN match_game x ON x.match_id = l.match_id AND x.game_number = l.game_number WHERE NOT EXISTS (SELECT 1 FROM match_game_ban y WHERE y.game_id = x.id);
 DROP TABLE lp_ban;
 
