@@ -125,6 +125,14 @@ GAME_FIELDS = "OverviewPage,MatchId,GameId,N_GameInMatch,Team1,Team2,WinTeam,Tea
 PLAYER_GAME_FIELDS = "OverviewPage,GameId,Link,Champion,Kills,Deaths,Assists,Team,Role,IngameRole,Side"
 
 
+# Pages Leaguepedia d'une competition en base qu'import_leaguepedia ne selectionne pas
+# (qualifications), par source_key.
+EXTRA_PAGES = {
+    "leaguepedia:LPL/2026 Season/Split 3": ["LPL/2026 Season/Regional Finals"],
+    "leaguepedia:2026 Season World Championship/Main Event": ["2026 Season World Championship/Play-In"],
+}
+
+
 def by_pages(name, year, pages, table, fields):
     def fetch():
         rows = []
@@ -159,9 +167,20 @@ class Season:
                 self.comp_pages[key] = comp["pages"]
                 for p in comp["pages"]:
                     self.page_key[p["OverviewPage"]] = key
-        self.missing_competitions = sorted(set(db.competitions) - set(self.comp_pages))
+        # Competitions hors selection d'import_leaguepedia (tournois secondaires, saisies a la
+        # main puis reliees a Leaguepedia) : la page de leur source_key, plus EXTRA_PAGES.
+        for key in db.competitions:
+            if key not in self.comp_pages and key.startswith("leaguepedia:"):
+                self.comp_pages[key] = [{"OverviewPage": key.split(":", 1)[1]}]
+                self.page_key[key.split(":", 1)[1]] = key
+            for page in EXTRA_PAGES.get(key, ()):
+                if key in self.comp_pages and page not in self.page_key:
+                    self.comp_pages[key].append({"OverviewPage": page})
+                    self.page_key[page] = key
         pages = sorted(self.page_key)
         self.schedule = by_pages("schedule", year, pages, "MatchSchedule", SCHEDULE_FIELDS)
+        found = {self.page_key[r["OverviewPage"]] for r in self.schedule if r["OverviewPage"] in self.page_key}
+        self.missing_competitions = sorted(set(db.competitions) - found)
         self.schedule_games = by_pages("schedule_games", year, pages, "MatchScheduleGame", SCHEDULE_GAME_FIELDS)
         self.games = by_pages("scoreboard_games", year, pages, "ScoreboardGames", GAME_FIELDS)
         self.player_games = by_pages("scoreboard_players", year, pages, "ScoreboardPlayers", PLAYER_GAME_FIELDS)
@@ -251,6 +270,18 @@ def country_codes():
 # Equipes : nom Leaguepedia -> equipe en base
 # ---------------------------------------------------------------------------
 
+# Equipes saisies a la main sous un autre nom que leur page Leaguepedia : nom Leaguepedia -> nom en base.
+TEAM_ALIASES = {
+    "ZSK (Chinese Team)": "ZSK",
+    "LODIS (Polish Team)": "LODIS",
+    "Unicorns of Love Sexy Edition": "UOL Sexy Edition",
+    "Senshi eSports (Benelux Team)": "Senshi eSports",
+    "Team Phantasma": "Phantasma",
+    "Team Heretics Academy": "Los Heretics",
+    "eSuba": "ESB",
+}
+
+
 class Teams:
     def __init__(self, db_teams, names):
         self.info = lp.teams_of(names)
@@ -266,6 +297,8 @@ class Teams:
 
     def id(self, name):
         """Equipe en base, avec la meme regle que l'import des competitions (nom, sinon code)."""
+        if name in TEAM_ALIASES:
+            return self.by_name.get(TEAM_ALIASES[name].lower())
         t = self.info.get(name)
         if not t:
             return self.by_name.get(name.lower())
