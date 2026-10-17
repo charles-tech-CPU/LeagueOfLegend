@@ -1,5 +1,14 @@
 <template>
-  <h1>Équipes <span class="count">{{ teams.length }}</span></h1>
+  <h1>Équipes <span class="count">{{ search.trim() ? `${filteredTeams.length} / ${teams.length}` : teams.length }}</span></h1>
+
+  <div class="filters">
+    <input
+      v-model="search"
+      type="search"
+      placeholder="Rechercher une équipe (nom, code, région)"
+      aria-label="Rechercher une équipe"
+    />
+  </div>
 
   <table v-if="sortedTeams.length">
     <thead>
@@ -42,6 +51,7 @@
       </tr>
     </tbody>
   </table>
+  <p v-else-if="loaded && search.trim()" class="muted">Aucune équipe ne correspond à « {{ search.trim() }} ».</p>
   <p v-else-if="loaded">Aucune équipe pour l'instant.</p>
 
   <h2>Ajouter une équipe</h2>
@@ -69,7 +79,20 @@ const editForm = reactive({ code: '', name: '', region: '' })
 
 const { toggleSort, sortArrow, sortList } = useSort('name', (team, field) => (team[field] ?? '').toString())
 
-const sortedTeams = computed(() => sortList(teams.value))
+const search = ref('')
+
+// Minuscules sans accents : "fenerbahce" trouve "Fenerbahçe", "kc" le code "KC"
+function normalize(text) {
+  return (text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+const filteredTeams = computed(() => {
+  const q = normalize(search.value.trim())
+  if (!q) return teams.value
+  return teams.value.filter(t => [t.name, t.code, t.region].some(v => normalize(v).includes(q)))
+})
+
+const sortedTeams = computed(() => sortList(filteredTeams.value))
 
 function startEdit(team) {
   editingId.value = team.id
@@ -131,6 +154,12 @@ onMounted(load)
 .actions {
   display: flex;
   gap: 6px;
+}
+.filters {
+  margin-bottom: 18px;
+}
+.filters input[type="search"] {
+  width: min(340px, 100%);
 }
 .count {
   font-size: 0.45em;
