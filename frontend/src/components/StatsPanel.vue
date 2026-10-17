@@ -28,6 +28,10 @@
       </div>
     </div>
 
+    <nav class="section-nav" aria-label="Sections des stats">
+      <a v-for="s in sections" :key="s.id" :href="`#${s.id}`" @click.prevent="scrollTo(s.id)">{{ s.label }}</a>
+    </nav>
+
     <div class="position-filter" role="group" aria-label="Filtrer par poste">
       <button type="button" :class="{ active: position === null }" @click="position = null">Tous les postes</button>
       <button
@@ -38,6 +42,168 @@
         :style="{ '--pos-color': p.color }"
         @click="position = p.key"
       >{{ p.key }}</button>
+    </div>
+
+    <div class="stats-grid">
+      <section v-if="stats.teams.length" id="stats-teams" class="stats-block wide featured">
+        <h3>Équipes</h3>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Équipe</th>
+                <th class="num">Manches</th>
+                <th class="num">V-D</th>
+                <th class="num">% V</th>
+                <th class="num">K / D / A</th>
+                <th class="num">Kills / manche</th>
+                <th class="num" title="Écart de kills moyen avec l'adversaire">± Kills</th>
+                <th class="num" title="Champions différents joués">Pool</th>
+                <th>Champion favori</th>
+                <th>Ban favori</th>
+                <th>Le plus banni contre</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="t in limited('teams', stats.teams)" :key="t.teamId">
+                <td>
+                  <router-link :to="`/teams/${t.teamId}`" class="team-link" :title="t.teamName">
+                    <TeamTag :id="t.teamId" :code="t.teamCode" :name="t.teamName" :has-logo="t.teamHasLogo" />
+                  </router-link>
+                </td>
+                <td class="num">{{ t.games }}</td>
+                <td class="num"><span class="win">{{ t.wins }}</span>-<span class="loss">{{ t.losses }}</span></td>
+                <td class="num">{{ winRate(t) ?? '—' }}</td>
+                <td class="num">{{ t.kills }} / {{ t.deaths }} / {{ t.assists }}</td>
+                <td class="num strong">{{ t.killsPerGame.toFixed(1) }}</td>
+                <td class="num" :class="diffClass(t.killDiffPerGame)">{{ signed(t.killDiffPerGame) }}</td>
+                <td class="num">{{ t.championPool }}</td>
+                <td><ChampionChip :pick="t.mostPicked" /></td>
+                <td><ChampionChip :pick="t.mostBanned" /></td>
+                <td><ChampionChip :pick="t.mostBannedAgainst" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ShowAll list="teams" :total="stats.teams.length" />
+      </section>
+
+      <section v-if="hasRecords" id="stats-records" class="stats-block wide featured">
+        <h3>Records sur une manche</h3>
+        <div class="records">
+          <div v-for="r in teamRecordLists" :key="r.key" class="record-col">
+            <h4>{{ r.title }}</h4>
+            <ol class="record-list">
+              <li v-for="(g, i) in r.games" :key="`${r.key}-${i}`">
+                <span class="record-rank">{{ i + 1 }}</span>
+                <span class="record-body">
+                  <router-link :to="`/teams/${g.teamId}`" class="pseudo">
+                    <TeamTag :id="g.teamId" :code="g.teamCode" :has-logo="g.teamHasLogo" />
+                  </router-link>
+                  <span class="muted small">
+                    vs {{ g.opponentCode }}<template v-if="g.competitionCode"> · {{ g.competitionCode }}</template>
+                    <template v-if="g.won !== null">
+                      · <span :class="g.won ? 'win' : 'loss'">{{ g.won ? 'V' : 'D' }}</span>
+                    </template>
+                  </span>
+                </span>
+                <component
+                  :is="g.matchId ? RouterLink : 'span'"
+                  :to="g.matchId ? `/matches/${g.matchId}` : undefined"
+                  class="record-value"
+                >
+                  {{ r.value(g) }}
+                </component>
+              </li>
+            </ol>
+          </div>
+          <div v-for="r in recordLists" :key="r.key" class="record-col">
+            <h4>{{ r.title }}</h4>
+            <ol class="record-list">
+              <li v-for="(g, i) in r.games" :key="`${r.key}-${i}`">
+                <span class="record-rank">{{ i + 1 }}</span>
+                <img v-if="championIconUrl(g.champion)" :src="championIconUrl(g.champion)" :alt="g.champion" :title="g.champion" />
+                <span class="record-body">
+                  <router-link :to="`/players/${g.playerId}`" class="pseudo">{{ g.pseudo }}</router-link>
+                  <span class="muted small">
+                    {{ g.teamCode }}<template v-if="g.opponentCode"> vs {{ g.opponentCode }}</template>
+                    <template v-if="g.won !== null">
+                      · <span :class="g.won ? 'win' : 'loss'">{{ g.won ? 'V' : 'D' }}</span>
+                    </template>
+                  </span>
+                </span>
+                <component
+                  :is="g.matchId ? RouterLink : 'span'"
+                  :to="g.matchId ? `/matches/${g.matchId}` : undefined"
+                  class="record-value"
+                  :class="r.key === 'bestKda' ? ratioClass(g.ratio) : ''"
+                >
+                  {{ r.value(g) }}
+                </component>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section v-if="stats.bans.teams.length" id="stats-bans" class="stats-block wide">
+        <h3>Bannissements</h3>
+        <div class="bans-grid">
+          <div class="table-scroll">
+            <h4>Par équipe</h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>Équipe</th>
+                  <th class="num">Manches</th>
+                  <th>Bans les plus fréquents</th>
+                  <th>Bans subis les plus fréquents</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="t in limited('banTeams', stats.bans.teams)" :key="t.teamId">
+                  <td>
+                    <router-link :to="`/teams/${t.teamId}`" class="team-link">
+                      <TeamTag :id="t.teamId" :code="t.teamCode" :name="t.teamName" :has-logo="t.teamHasLogo" />
+                    </router-link>
+                  </td>
+                  <td class="num">{{ t.games }}</td>
+                  <td><ChampionPicks :picks="t.topMade" /></td>
+                  <td><ChampionPicks :picks="t.topReceived" /></td>
+                </tr>
+              </tbody>
+            </table>
+            <ShowAll list="banTeams" :total="stats.bans.teams.length" />
+          </div>
+          <div class="table-scroll">
+            <h4 title="Bans adverses, sur une manche qu'il joue, d'un champion qu'il a joué au moins deux fois">
+              Joueurs les plus ciblés
+            </h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>Joueur</th>
+                  <th>Poste</th>
+                  <th class="num">Bans ciblés</th>
+                  <th class="num">/ manche</th>
+                  <th>Champions bannis</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="p in limited('targeted', targetedRows)" :key="p.playerId">
+                  <td><PlayerCell :player="p" /></td>
+                  <td><span class="pos-tag" :style="{ '--pos-color': positionColor(p.position) }">{{ p.position }}</span></td>
+                  <td class="num strong">{{ p.targetedBans }}</td>
+                  <td class="num">{{ p.targetedPerGame.toFixed(2) }}</td>
+                  <td><ChampionPicks :picks="p.topTargeted" /></td>
+                </tr>
+              </tbody>
+            </table>
+            <ShowAll list="targeted" :total="targetedRows.length" />
+            <p v-if="!targetedRows.length" class="muted small">Aucun joueur ciblé{{ position ? ` en ${position}` : '' }}.</p>
+          </div>
+        </div>
+      </section>
     </div>
 
     <section v-if="positionCards.length" class="stats-block positions-block">
@@ -73,31 +239,7 @@
       </div>
     </section>
 
-    <div class="stats-grid">
-      <section class="stats-block">
-        <h3>MVP</h3>
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Joueur</th>
-                <th>Poste</th>
-                <th class="num">MVP série</th>
-                <th class="num">MVP manche</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in mvpRows" :key="p.playerId">
-                <td><PlayerCell :player="p" /></td>
-                <td><span class="pos-tag" :style="{ '--pos-color': positionColor(p.position) }">{{ p.position }}</span></td>
-                <td class="num">{{ p.seriesMvp }}</td>
-                <td class="num">{{ p.gameMvp }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
+    <div id="stats-players" class="stats-grid">
       <section class="stats-block wide">
         <h3>Joueurs · K/D/A et champions</h3>
         <div class="table-scroll">
@@ -156,6 +298,30 @@
       </section>
 
       <section class="stats-block">
+        <h3>MVP</h3>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Joueur</th>
+                <th>Poste</th>
+                <th class="num">MVP série</th>
+                <th class="num">MVP manche</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in mvpRows" :key="p.playerId">
+                <td><PlayerCell :player="p" /></td>
+                <td><span class="pos-tag" :style="{ '--pos-color': positionColor(p.position) }">{{ p.position }}</span></td>
+                <td class="num">{{ p.seriesMvp }}</td>
+                <td class="num">{{ p.gameMvp }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="stats-champions" class="stats-block wide">
         <h3>Champions<span v-if="position" class="muted small"> · picks en {{ position }}</span></h3>
         <div class="table-scroll">
           <table>
@@ -197,76 +363,6 @@
         </div>
       </section>
 
-      <section v-if="stats.teams.length && !position" class="stats-block wide">
-        <h3>Équipes</h3>
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Équipe</th>
-                <th class="num">Manches</th>
-                <th class="num">V-D</th>
-                <th class="num">% V</th>
-                <th class="num">Kills</th>
-                <th class="num">Morts</th>
-                <th class="num">Kills / manche</th>
-                <th>Champion favori</th>
-                <th>Ban favori</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="t in stats.teams" :key="t.teamId">
-                <td>
-                  <router-link :to="`/teams/${t.teamId}`" class="team-link">
-                    <TeamTag :id="t.teamId" :code="t.teamCode" :name="t.teamName" :has-logo="t.teamHasLogo" />
-                    <span class="muted small">{{ t.teamName }}</span>
-                  </router-link>
-                </td>
-                <td class="num">{{ t.games }}</td>
-                <td class="num"><span class="win">{{ t.wins }}</span>-<span class="loss">{{ t.losses }}</span></td>
-                <td class="num">{{ winRate(t) ?? '—' }}</td>
-                <td class="num">{{ t.kills }}</td>
-                <td class="num">{{ t.deaths }}</td>
-                <td class="num strong">{{ t.killsPerGame.toFixed(1) }}</td>
-                <td><ChampionChip :pick="t.mostPicked" /></td>
-                <td><ChampionChip :pick="t.mostBanned" /></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section v-if="hasRecords" class="stats-block wide">
-        <h3>Records sur une manche</h3>
-        <div class="records">
-          <div v-for="r in recordLists" :key="r.key" class="record-col">
-            <h4>{{ r.title }}</h4>
-            <ol class="record-list">
-              <li v-for="(g, i) in r.games" :key="`${r.key}-${i}`">
-                <span class="record-rank">{{ i + 1 }}</span>
-                <img v-if="championIconUrl(g.champion)" :src="championIconUrl(g.champion)" :alt="g.champion" :title="g.champion" />
-                <span class="record-body">
-                  <router-link :to="`/players/${g.playerId}`" class="pseudo">{{ g.pseudo }}</router-link>
-                  <span class="muted small">
-                    {{ g.teamCode }}<template v-if="g.opponentCode"> vs {{ g.opponentCode }}</template>
-                    <template v-if="g.won !== null">
-                      · <span :class="g.won ? 'win' : 'loss'">{{ g.won ? 'V' : 'D' }}</span>
-                    </template>
-                  </span>
-                </span>
-                <component
-                  :is="g.matchId ? RouterLink : 'span'"
-                  :to="g.matchId ? `/matches/${g.matchId}` : undefined"
-                  class="record-value"
-                  :class="r.key === 'bestKda' ? ratioClass(g.ratio) : ''"
-                >
-                  {{ r.value(g) }}
-                </component>
-              </li>
-            </ol>
-          </div>
-        </div>
-      </section>
     </div>
   </template>
 </template>
@@ -285,12 +381,75 @@ const props = defineProps({
   scope: { type: Object, required: true }
 })
 
-const stats = ref({ summary: null, champions: [], mvps: [], kda: [], positions: [], teams: [], records: null })
+const stats = ref({
+  summary: null,
+  champions: [],
+  mvps: [],
+  kda: [],
+  positions: [],
+  teams: [],
+  records: null,
+  bans: { teams: [], players: [] }
+})
 const loaded = ref(false)
 // Poste filtre (null = tous)
 const position = ref(null)
 
 const hasData = computed(() => stats.value.champions.length || stats.value.mvps.length || stats.value.kda.length)
+
+// Raccourcis vers les sections, dans l'ordre de la page (seulement celles affichees)
+const sections = computed(() => [
+  { id: 'stats-teams', label: 'Équipes', shown: stats.value.teams.length },
+  { id: 'stats-records', label: 'Records', shown: hasRecords.value },
+  { id: 'stats-bans', label: 'Bannissements', shown: stats.value.bans.teams.length },
+  { id: 'stats-players', label: 'Joueurs', shown: stats.value.kda.length || stats.value.mvps.length },
+  { id: 'stats-champions', label: 'Champions', shown: stats.value.champions.length }
+].filter(s => s.shown))
+
+function scrollTo(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// Longues listes repliees sur les premieres lignes, depliables une a une
+const COLLAPSED_ROWS = 10
+const expanded = ref(new Set())
+
+function limited(key, rows) {
+  return expanded.value.has(key) ? rows : rows.slice(0, COLLAPSED_ROWS)
+}
+
+function toggle(key) {
+  const next = new Set(expanded.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expanded.value = next
+}
+
+const ShowAll = (showProps) => {
+  if (showProps.total <= COLLAPSED_ROWS) return null
+  const open = expanded.value.has(showProps.list)
+  return h(
+    'button',
+    { type: 'button', class: 'show-all', onClick: () => toggle(showProps.list) },
+    open ? 'Réduire' : `Tout afficher (${showProps.total})`
+  )
+}
+ShowAll.props = ['list', 'total']
+
+const targetedRows = computed(() =>
+  stats.value.bans.players.filter(p => !position.value || p.position === position.value)
+)
+
+// Ecart de kills moyen, signe : "+3.5", "-1.0"
+function signed(value) {
+  if (value == null) return '—'
+  return `${value > 0 ? '+' : ''}${value.toFixed(1)}`
+}
+
+function diffClass(value) {
+  if (value == null || value === 0) return ''
+  return value > 0 ? 'win' : 'loss'
+}
 
 const positionCards = computed(() => stats.value.positions ?? [])
 
@@ -327,10 +486,30 @@ const recordLists = computed(() => {
       title: 'Meilleur KDA',
       games: r.bestKda,
       value: g => `${g.kills}/${g.deaths}/${g.assists} · ${kdaRatio(g.ratio)}`
-    }
+    },
+    { key: 'mostDeaths', title: 'Plus de morts', games: r.mostDeaths ?? [], value: g => `${g.deaths} morts` }
   ].map(list => ({ ...list, games: list.games.filter(g => !position.value || g.position === position.value) }))
 })
-const hasRecords = computed(() => recordLists.value.some(r => r.games.length))
+// Records d'equipe : independants du filtre par poste
+const teamRecordLists = computed(() => {
+  const r = stats.value.records
+  if (!r) return []
+  return [
+    {
+      key: 'mostTeamKills',
+      title: "Plus de kills d'équipe",
+      games: r.mostTeamKills ?? [],
+      value: g => `${g.kills} kills`
+    },
+    {
+      key: 'biggestKillGap',
+      title: 'Plus gros écart de kills',
+      games: r.biggestKillGap ?? [],
+      value: g => `${g.kills}-${g.opponentKills}`
+    }
+  ].filter(list => list.games.length)
+})
+const hasRecords = computed(() => teamRecordLists.value.length > 0 || recordLists.value.some(r => r.games.length))
 
 // Icone et nom d'un champion, avec son nombre d'occurrences
 const ChampionChip = (chipProps) => {
@@ -343,6 +522,19 @@ const ChampionChip = (chipProps) => {
   ])
 }
 ChampionChip.props = ['pick']
+
+// Quelques champions avec leur nombre d'occurrences, en icones
+const ChampionPicks = (pickProps) => {
+  const picks = pickProps.picks ?? []
+  if (!picks.length) return h('span', { class: 'muted' }, '—')
+  return h('span', { class: 'mini-champs' }, picks.map(c =>
+    h('span', { class: 'pos-champ', title: `${c.champion} : ${c.picks}` }, [
+      championIconUrl(c.champion) ? h('img', { src: championIconUrl(c.champion), alt: c.champion }) : c.champion,
+      h('span', String(c.picks))
+    ])
+  ))
+}
+ChampionPicks.props = ['picks']
 
 // Meilleur ratio K/D/A de chaque poste (la liste kda est deja triee par ratio decroissant)
 const bestKda = computed(() => {
@@ -447,14 +639,14 @@ watch(() => props.scope, load, { immediate: true, deep: true })
   flex-wrap: wrap;
   gap: 6px;
 }
-.pos-champ {
+:deep(.pos-champ) {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   font-size: 0.78em;
   font-weight: 700;
 }
-.pos-champ img {
+:deep(.pos-champ img) {
   width: 24px;
   height: 24px;
   border-radius: 5px;
@@ -474,6 +666,69 @@ watch(() => props.scope, load, { immediate: true, deep: true })
 }
 .stats-block.wide {
   flex-basis: 100%;
+}
+.stats-grid + .stats-grid,
+.stats-grid + .positions-block {
+  margin-top: 24px;
+}
+.stats-block.featured h3 {
+  font-size: 1.15em;
+}
+.section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 6px 0;
+  background: var(--bg);
+}
+.section-nav a {
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+}
+.section-nav a:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+:deep(.show-all) {
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.82em;
+  cursor: pointer;
+}
+:deep(.show-all:hover) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.bans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
+  gap: 20px;
+}
+.bans-grid h4 {
+  margin: 0 0 8px;
+  font-size: 0.88em;
+  color: var(--text-muted);
+}
+#stats-teams,
+#stats-records,
+#stats-bans,
+#stats-players,
+#stats-champions {
+  scroll-margin-top: 56px;
 }
 .stats-block h3 {
   margin: 0 0 12px;
@@ -495,13 +750,13 @@ watch(() => props.scope, load, { immediate: true, deep: true })
 .strong {
   font-weight: 800;
 }
-.champion-cell {
+:deep(.champion-cell) {
   display: flex;
   align-items: center;
   gap: 8px;
   white-space: nowrap;
 }
-.champion-cell img {
+:deep(.champion-cell img) {
   width: 22px;
   height: 22px;
   border-radius: 5px;
@@ -574,7 +829,7 @@ watch(() => props.scope, load, { immediate: true, deep: true })
 .loss {
   color: var(--loss);
 }
-.mini-champs {
+:deep(.mini-champs) {
   display: inline-flex;
   align-items: center;
   gap: 6px;

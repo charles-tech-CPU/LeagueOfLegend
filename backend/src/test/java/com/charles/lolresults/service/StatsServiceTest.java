@@ -265,6 +265,61 @@ class StatsServiceTest {
         assertThat(stats.records().bestKda().get(0).pseudo()).isEqualTo("Humanoid");
     }
 
+    @Test
+    void calculeEcartsDeKillsRecordsDEquipeEtBans() {
+        // Manche 1 : G2 8 kills, FNC 1. Manche 2 : G2 1 kill, FNC 9.
+        MatchGame game1 = game(g2);
+        MatchGame game2 = game(fnc);
+        when(gamePlayerRepository.findByGame_Match_Competition_Id(COMPETITION_ID))
+                .thenReturn(List.of(
+                        inGame(game1, line(caps, g2, "Azir", 8, 0, 1)),
+                        inGame(game1, line(humanoid, fnc, "Orianna", 1, 6, 0)),
+                        inGame(game2, line(caps, g2, "Azir", 1, 3, 0)),
+                        inGame(game2, line(humanoid, fnc, "Orianna", 9, 1, 3))));
+        // FNC bannit Azir (pool de Caps) en manche 2, Zed en manche 1 ; G2 bannit Orianna.
+        when(gameBanRepository.findByGame_Match_Competition_Id(COMPETITION_ID))
+                .thenReturn(List.of(
+                        inGame(game1, ban(fnc, "Zed")),
+                        inGame(game2, ban(fnc, "Azir")),
+                        inGame(game2, ban(g2, "Orianna"))));
+        when(matchRepository.findByCompetitionIdOrderByDateAscTimeAsc(COMPETITION_ID))
+                .thenReturn(List.of());
+        when(gameRepository.findByMatch_Competition_Id(COMPETITION_ID)).thenReturn(List.of());
+
+        StatsDto stats = statsService.compute(COMPETITION_ID, null);
+
+        StatsDto.TeamStat g2Stat = stats.teams().stream()
+                .filter(t -> t.teamCode().equals("G2"))
+                .findFirst()
+                .orElseThrow();
+        // (8 - 1) + (1 - 9) sur 2 manches
+        assertThat(g2Stat.killDiffPerGame()).isEqualTo(-0.5);
+        assertThat(g2Stat.championPool()).isEqualTo(1L);
+        assertThat(g2Stat.mostBannedAgainst()).isEqualTo(new StatsDto.ChampionPick("Azir", 1));
+
+        assertThat(stats.records().mostTeamKills().get(0).teamCode()).isEqualTo("FNC");
+        assertThat(stats.records().mostTeamKills().get(0).kills()).isEqualTo(9L);
+        assertThat(stats.records().biggestKillGap().get(0).teamCode()).isEqualTo("FNC");
+        assertThat(stats.records().biggestKillGap().get(0).opponentCode()).isEqualTo("G2");
+        assertThat(stats.records().mostDeaths().get(0).pseudo()).isEqualTo("Humanoid");
+
+        StatsDto.TeamBans fncBans = stats.bans().teams().stream()
+                .filter(t -> t.teamCode().equals("FNC"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(fncBans.games()).isEqualTo(2L);
+        assertThat(fncBans.bansMade()).isEqualTo(2L);
+        assertThat(fncBans.bansReceived()).isEqualTo(1L);
+        assertThat(fncBans.topReceived()).containsExactly(new StatsDto.ChampionPick("Orianna", 1));
+
+        // Caps est cible par le ban d'Azir ; Zed n'est pas dans son pool. Humanoid par Orianna.
+        assertThat(stats.bans().players())
+                .extracting(StatsDto.PlayerBans::pseudo, StatsDto.PlayerBans::targetedBans)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("Caps", 1L),
+                        org.assertj.core.groups.Tuple.tuple("Humanoid", 1L));
+    }
+
     private static MatchGame game(Team winner) {
         MatchGame game = new MatchGame();
         game.setWinner(winner);

@@ -203,6 +203,11 @@ final class StatTally {
             .thenComparing(Comparator.comparingLong((StatsDto.GamePerformance p) -> p.kills() + p.assists())
                     .reversed());
 
+    static final Comparator<StatsDto.GamePerformance> MOST_DEATHS = Comparator.comparingLong(
+                    StatsDto.GamePerformance::deaths)
+            .reversed()
+            .thenComparingDouble(StatsDto.GamePerformance::ratio);
+
     static boolean hasKda(MatchGamePlayer line) {
         return line.getKills() != null || line.getDeaths() != null || line.getAssists() != null;
     }

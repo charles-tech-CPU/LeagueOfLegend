@@ -210,7 +210,9 @@ const DDRAGON_ID = {
   'Xin Zhao': 'XinZhao'
 }
 
-const DDRAGON_VERSION = '14.20.1'
+// A monter a la sortie d'un nouveau champion (sinon son icone est introuvable) :
+// derniere version sur https://ddragon.leagueoflegends.com/api/versions.json
+const DDRAGON_VERSION = '16.20.1'
 
 /** Icone carree du champion (CDN public Data Dragon), ou null si le nom est inconnu. */
 export function championIconUrl(input) {

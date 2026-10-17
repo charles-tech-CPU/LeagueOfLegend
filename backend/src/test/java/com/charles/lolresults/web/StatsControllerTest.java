@@ -29,7 +29,8 @@ class StatsControllerTest {
             List.of(),
             List.of(),
             List.of(),
-            new StatsDto.Records(List.of(), List.of(), List.of()));
+            new StatsDto.Records(List.of(), List.of(), List.of(), List.of(), List.of(), List.of()),
+            new StatsDto.Bans(List.of(), List.of()));
 
     @Autowired
     private MockMvc mockMvc;
@@ -68,8 +69,13 @@ class StatsControllerTest {
                                 2,
                                 List.of(ahri))),
                         List.of(new StatsDto.PositionStat(Position.MID, 4, 20, 5, 30, 10.0, List.of(ahri))),
-                        List.of(new StatsDto.TeamStat(1L, "G2", "G2 Esports", true, 4, 3, 1, 50, 20, 12.5, ahri, null)),
-                        new StatsDto.Records(List.of(), List.of(), List.of())));
+                        List.of(new StatsDto.TeamStat(
+                                1L, "G2", "G2 Esports", true, 4, 3, 1, 50, 20, 70, 12.5, 7.5, 9, ahri, null, null)),
+                        new StatsDto.Records(List.of(), List.of(), List.of(), List.of(), List.of(), List.of()),
+                        new StatsDto.Bans(
+                                List.of(new StatsDto.TeamBans(
+                                        1L, "G2", "G2 Esports", true, 4, 20, List.of(ahri), 20, List.of())),
+                                List.of())));
 
         mockMvc.perform(get("/api/stats").param("competitionId", "1"))
                 .andExpect(status().isOk())
@@ -84,7 +90,9 @@ class StatsControllerTest {
                 .andExpect(jsonPath("$.kda[0].topChampions[0].champion").value("Ahri"))
                 .andExpect(jsonPath("$.champions[0].picksByPosition.MID").value(3))
                 .andExpect(jsonPath("$.positions[0].topChampions[0].champion").value("Ahri"))
-                .andExpect(jsonPath("$.teams[0].mostPicked.champion").value("Ahri"));
+                .andExpect(jsonPath("$.teams[0].mostPicked.champion").value("Ahri"))
+                .andExpect(jsonPath("$.teams[0].killDiffPerGame").value(7.5))
+                .andExpect(jsonPath("$.bans.teams[0].topMade[0].champion").value("Ahri"));
     }
 
     @Test
