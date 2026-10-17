@@ -23,7 +23,17 @@ const routes = [
   { path: '/power-ranking', name: 'power-ranking', component: PowerRankingView }
 ]
 
+// Delai laisse a une page pour charger ses donnees avant de restaurer la position
+const RESTORE_SCROLL_DELAY_MS = 350
+
 export default createRouter({
   history: createWebHistory(),
-  routes
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    // Retour / avance du navigateur : on retrouve la position qu'on avait quittee
+    if (savedPosition) return new Promise(resolve => setTimeout(() => resolve(savedPosition), RESTORE_SCROLL_DELAY_MS))
+    // Simple changement d'onglet (?tab=) sur la meme page : on ne bouge pas
+    if (to.path === from.path) return false
+    return { top: 0 }
+  }
 })

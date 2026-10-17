@@ -1,7 +1,5 @@
 <template>
-  <router-link v-if="match" :to="`/competitions/${match.competitionId}`" class="back">
-    ← {{ match.competitionCode }}
-  </router-link>
+  <button v-if="match" type="button" class="back" @click="goBack">← {{ backLabel }}</button>
 
   <header v-if="match" class="match-hero">
     <p class="meta">
@@ -153,6 +151,20 @@
             </div>
           </div>
         </div>
+
+        <div v-if="games.length > 1" class="game-nav">
+          <button v-if="g.gameNumber > 1" type="button" class="btn-secondary" @click="showGame(g.gameNumber - 1)">
+            ← Game {{ g.gameNumber - 1 }}
+          </button>
+          <button
+            v-if="g.gameNumber < games.length"
+            type="button"
+            class="btn-secondary next-game"
+            @click="showGame(g.gameNumber + 1)"
+          >
+            Game {{ g.gameNumber + 1 }} →
+          </button>
+        </div>
       </section>
 
       <datalist id="champion-list">
@@ -160,15 +172,18 @@
       </datalist>
 
       <div class="actions">
+        <button type="button" class="btn-secondary" @click="goBack">← {{ backLabel }}</button>
         <button type="button" :disabled="saving" @click="save">Enregistrer les détails</button>
         <span v-if="savedMessage" class="saved">{{ savedMessage }}</span>
+        <span v-else-if="dirty" class="unsaved">Modifications non enregistrées</span>
       </div>
     </template>
   </template>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import api, { teamLogoUrl } from '../services/api'
 import { POSITIONS } from '../positions'
 import { CHAMPIONS, championName } from '../champions'
@@ -189,6 +204,42 @@ const loaded = ref(false)
 const saving = ref(false)
 const error = ref('')
 const savedMessage = ref('')
+// Etat du formulaire au dernier chargement / enregistrement, pour reperer les modifications
+const savedSnapshot = ref('')
+
+const router = useRouter()
+// Page d'ou l'on vient dans l'appli (vue-router la garde dans l'historique du navigateur)
+const cameFromApp = window.history.state?.back != null
+
+const backLabel = computed(() => (cameFromApp ? 'Retour' : match.value?.competitionCode ?? 'Retour'))
+
+/** Retour a la page precedente (meme onglet, meme position) ; a defaut, au calendrier de la competition. */
+function goBack() {
+  if (cameFromApp) router.back()
+  else router.push({ path: `/competitions/${match.value.competitionId}`, query: { tab: 'calendar' } })
+}
+
+function showGame(gameNumber) {
+  activeGame.value = gameNumber
+  document.querySelector('.game-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function snapshot() {
+  return JSON.stringify({ games: games.value, seriesMvp: seriesMvp.value })
+}
+
+const dirty = computed(() => loaded.value && savedSnapshot.value !== '' && snapshot() !== savedSnapshot.value)
+
+const LEAVE_WARNING = 'Des détails du match ne sont pas enregistrés. Quitter quand même ?'
+
+// Quitter la page (retour, lien, autre onglet de l'appli) sans perdre la saisie par megarde
+onBeforeRouteLeave(() => !dirty.value || window.confirm(LEAVE_WARNING))
+
+function onBeforeUnload(event) {
+  if (!dirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
 
 const season = computed(() => match.value ? Number(match.value.date.slice(0, 4)) : null)
 
@@ -323,6 +374,7 @@ function fillForm(details) {
     buildGame(i + 1, details.games.find(g => g.gameNumber === i + 1)))
   seriesMvp.value = details.mvpPlayerId
   if (!games.value.some(g => g.gameNumber === activeGame.value)) activeGame.value = 1
+  savedSnapshot.value = snapshot()
 }
 
 /** Ajoute aux effectifs les joueurs deja saisis qui n'y sont plus (transfert depuis). */
@@ -434,15 +486,24 @@ async function load() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  window.addEventListener('beforeunload', onBeforeUnload)
+  load()
+})
+onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload))
 </script>
 
 <style scoped>
 .back {
   display: inline-block;
   margin-top: 22px;
+  padding: 0;
+  border: none;
+  background: none;
   font-size: 0.88em;
+  font-weight: 600;
   color: var(--text-muted);
+  cursor: pointer;
 }
 .back:hover {
   color: var(--accent);
@@ -678,6 +739,18 @@ onMounted(load)
   align-items: center;
   gap: 14px;
   margin: 8px 0 24px;
+}
+.game-nav {
+  display: flex;
+  margin-top: 16px;
+}
+.game-nav .next-game {
+  margin-left: auto;
+}
+.unsaved {
+  color: var(--gold, #f5c451);
+  font-weight: 600;
+  font-size: 0.9em;
 }
 .saved {
   color: var(--win);

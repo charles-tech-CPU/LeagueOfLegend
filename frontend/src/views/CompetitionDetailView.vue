@@ -42,7 +42,7 @@
       role="tab"
       :aria-selected="activeTab === t.key"
       :class="{ active: activeTab === t.key }"
-      @click="activeTab = t.key"
+      @click="selectTab(t.key)"
     >
       <span class="tab-icon">{{ t.icon }}</span>{{ t.label }}
     </button>
@@ -222,7 +222,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api, { teamLogoUrl } from '../services/api'
 import StandingsTable from '../components/StandingsTable.vue'
 import HeadToHeadTable from '../components/HeadToHeadTable.vue'
@@ -473,6 +473,15 @@ async function submitMatch() {
   } catch (e) {
     error.value = e.response?.data?.error ?? "Erreur lors de la création du match."
   }
+}
+
+// L'onglet suit l'URL (?tab=calendar) sans ajouter d'entree a l'historique : en revenant
+// d'une fiche match, on retrouve l'onglet qu'on avait quitte.
+const router = useRouter()
+
+function selectTab(key) {
+  activeTab.value = key
+  router.replace({ query: { ...route.query, tab: key } })
 }
 
 // Competition sans classement (ex: EMEA Masters LCQ, uniquement des groupes
