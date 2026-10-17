@@ -4,12 +4,12 @@
     :class="{ compact: width != null && width < COMPACT_W, done: winner != null, today: isToday, dimmed: highlight != null && !involves(highlight), focus: highlight != null && involves(highlight) }"
     :style="width ? { width: `${width}px`, height: `${height}px` } : null"
   >
-    <header class="card-head">
+    <header class="card-head" :title="round ? `${round} · ${shortDay(match.date)}` : null">
       <span class="meta">
         <span v-if="round" class="round">{{ round }}</span>
-        <span v-if="isToday" class="live">● Aujourd'hui</span>
-        <span v-else>{{ shortDay(match.date) }}</span>
-        <span v-if="time">· {{ time }}</span>
+        <span v-if="isToday" class="live when">● Aujourd'hui</span>
+        <span v-else class="when">{{ shortDay(match.date) }}</span>
+        <span v-if="time" class="when">· {{ time }}</span>
       </span>
       <span class="head-right">
         <router-link
@@ -131,12 +131,17 @@ function involves(id) {
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
+/* Le round reste entier : c'est la date qui se replie s'il manque de place */
 .round {
+  flex-shrink: 0;
   font-weight: 700;
   color: var(--text-muted);
   margin-right: 4px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+.when {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }

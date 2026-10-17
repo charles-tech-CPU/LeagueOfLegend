@@ -452,7 +452,7 @@ function buildTreeBoard(key, label, matches, geometry) {
   const width = colX(maxCol + 1) - colGap
   const height = Math.max(...nodes.map(n => n.y + CARD_H), 0)
   if (lanes.length === 1) lanes[0].hideTitle = true
-  return { kind: 'tree', key, label, nodes, edges, lanes, width, height, cols: maxCol + 1, cardW, champion: championOf(matches) }
+  return { kind: 'tree', key, label, nodes, edges, lanes, width, height, cols: maxCol + 1, cardW, colGap, champion: championOf(matches) }
 }
 
 function championOf(matches) {

@@ -42,7 +42,8 @@
                 v-for="col in lane.columns"
                 :key="col.x"
                 class="col-title"
-                :style="{ top: `${lane.top + 34}px`, left: `${col.x}px`, width: `${board.cardW}px` }"
+                :style="{ top: `${lane.top + 34}px`, left: `${col.x}px`, width: `${board.cardW + (board.colGap ?? 0) - 8}px` }"
+                :title="col.labels.join(' · ')"
               >
                 {{ col.labels.join(' · ') }}
               </div>

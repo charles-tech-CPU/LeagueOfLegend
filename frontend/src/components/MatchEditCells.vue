@@ -7,7 +7,14 @@
       <option value="PLAYOFFS">Playoffs</option>
     </select>
   </td>
-  <td><input v-model="edit.roundLabel" class="round-input" aria-label="Round" /></td>
+  <td>
+    <!-- Le texte invisible donne sa largeur a la colonne (le round le plus long du
+         tableau) ; tous les champs la remplissent, donc meme largeur et jamais tronques -->
+    <span class="round-field">
+      <span class="round-sizer" aria-hidden="true">{{ edit.roundLabel }}</span>
+      <input v-model="edit.roundLabel" class="round-input" size="1" :title="edit.roundLabel" aria-label="Round" />
+    </span>
+  </td>
   <td>
     <select v-model="edit.bestOf" aria-label="Format (best of)">
       <option value="BO1">BO1</option>
@@ -65,9 +72,30 @@ function hasLogo(teamId) {
   width: 100px;
   padding: 9px 6px;
 }
+.round-field {
+  display: inline-grid;
+  min-width: 70px;
+  width: 100%;
+}
+.round-sizer,
 .round-input {
-  width: 70px;
+  grid-area: 1 / 1;
   padding: 9px 6px;
+  border: 1px solid transparent;
+}
+.round-sizer {
+  visibility: hidden;
+  height: 0;
+  padding-block: 0;
+  white-space: pre;
+}
+.round-input {
+  width: 100%;
+  min-width: 0;
+  border-color: var(--border);
+}
+.round-input:focus {
+  border-color: var(--accent);
 }
 select {
   padding: 9px 6px;
