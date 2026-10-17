@@ -7,7 +7,7 @@
       <div>
         <span v-if="team" class="code-badge">{{ team.code }}</span>
         <h1>{{ team?.name ?? '...' }}</h1>
-        <p v-if="team?.region" class="hero-sub">{{ team.region }}</p>
+        <p v-if="team?.region" class="hero-sub"><RegionBadge :region="team.region" /></p>
         <p v-if="formerNames.length" class="hero-sub former">
           Anciennement {{ formerNames.map(n => n.name).join(', ') }}
         </p>
@@ -159,6 +159,7 @@ import api, { teamLogoUrl } from '../services/api'
 import { POSITIONS } from '../positions'
 import { fullDay } from '../format'
 import CountryFlag from '../components/CountryFlag.vue'
+import RegionBadge from '../components/RegionBadge.vue'
 import CountrySelect from '../components/CountrySelect.vue'
 import CompetitionDatePicker from '../components/CompetitionDatePicker.vue'
 

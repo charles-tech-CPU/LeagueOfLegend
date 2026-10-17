@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { notifyMatchChanged } from '../matchEvents'
 
 // Ports du backend : HTTP en LAN (http://<ip>), HTTPS via Tailscale
 // (https://serveur-foyer.tail0af124.ts.net).
@@ -16,6 +17,14 @@ const api = axios.create({
 
 export function teamLogoUrl(teamId) {
   return `${API_BASE_URL}/teams/${teamId}/logo`
+}
+
+// Apres une ecriture sur un match, previent les vues qui en dependent (power ranking...)
+function notifying(promise) {
+  return promise.then(data => {
+    notifyMatchChanged()
+    return data
+  })
 }
 
 export default {
@@ -76,14 +85,14 @@ export default {
   // from : ignore les matchs plus anciens (tournois historiques sans score)
   getScheduledMatches: (from) =>
     api.get('/matches', { params: { status: 'SCHEDULED', from } }).then(r => r.data),
-  createMatch: (payload) => api.post('/matches', payload).then(r => r.data),
-  updateMatch: (id, payload) => api.put(`/matches/${id}`, payload).then(r => r.data),
+  createMatch: (payload) => notifying(api.post('/matches', payload).then(r => r.data)),
+  updateMatch: (id, payload) => notifying(api.put(`/matches/${id}`, payload).then(r => r.data)),
   getMatch: (id) => api.get(`/matches/${id}`).then(r => r.data),
   // Details facultatifs d'une serie : manches, champions, K/D/A, MVP
   getMatchDetails: (id) => api.get(`/matches/${id}/details`).then(r => r.data),
   // payload : { mvpPlayerId, games: [{ gameNumber, winnerTeamId, mvpPlayerId, players: [...] }] }
-  saveMatchDetails: (id, payload) => api.put(`/matches/${id}/details`, payload).then(r => r.data),
-  deleteMatch: (id) => api.delete(`/matches/${id}`),
+  saveMatchDetails: (id, payload) => notifying(api.put(`/matches/${id}/details`, payload).then(r => r.data)),
+  deleteMatch: (id) => notifying(api.delete(`/matches/${id}`)),
 
   // Classement / tete-a-tete (calcules cote backend, jamais stockes)
   getStandings: (competitionId, groupId) =>
@@ -92,5 +101,8 @@ export default {
     api.get('/head-to-head', { params: { competitionId, groupId } }).then(r => r.data),
 
   // Statistiques (picks/bans, MVP, KDA) : par competition, par saison, ou tout l'historique
-  getStats: (params) => api.get('/stats', { params }).then(r => r.data)
+  getStats: (params) => api.get('/stats', { params }).then(r => r.data),
+
+  // Power ranking (Elo) d'une saison, recalcule cote backend a chaque appel
+  getPowerRanking: (season) => api.get('/power-ranking', { params: { season } }).then(r => r.data)
 }

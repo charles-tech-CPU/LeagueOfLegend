@@ -10,6 +10,7 @@
     <router-link to="/teams" class="nav-link" :class="{ 'router-link-active': $route.path.startsWith('/teams') }">🛡️ Équipes</router-link>
     <router-link to="/players" class="nav-link" :class="{ 'router-link-active': $route.path.startsWith('/players') }">🎮 Joueurs</router-link>
     <router-link to="/stats" class="nav-link" :class="{ 'router-link-active': $route.path.startsWith('/stats') }">📈 Stats</router-link>
+    <router-link to="/power-ranking" class="nav-link">⚡ Power Ranking</router-link>
   </nav>
   <router-view />
 </template>

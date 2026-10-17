@@ -8,6 +8,7 @@ import PlayerDetailView from '../views/PlayerDetailView.vue'
 import UpcomingMatchesView from '../views/UpcomingMatchesView.vue'
 import MatchDetailView from '../views/MatchDetailView.vue'
 import StatsView from '../views/StatsView.vue'
+import PowerRankingView from '../views/PowerRankingView.vue'
 
 const routes = [
   { path: '/', name: 'competitions', component: CompetitionsView },
@@ -18,7 +19,8 @@ const routes = [
   { path: '/players/:id', name: 'player-detail', component: PlayerDetailView, props: true },
   { path: '/upcoming', name: 'upcoming', component: UpcomingMatchesView },
   { path: '/matches/:id', name: 'match-detail', component: MatchDetailView, props: true },
-  { path: '/stats', name: 'stats', component: StatsView }
+  { path: '/stats', name: 'stats', component: StatsView },
+  { path: '/power-ranking', name: 'power-ranking', component: PowerRankingView }
 ]
 
 export default createRouter({

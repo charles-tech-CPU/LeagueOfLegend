@@ -32,7 +32,7 @@
         </span>
         <span class="comp-name">{{ c.name }}</span>
         <span class="comp-meta">
-          {{ c.region ?? 'International' }}<template v-if="c.split"> · {{ splitLabel(c.split) }}</template>
+          {{ regionLabel(c.region, 'International') }}<template v-if="c.split"> · {{ splitLabel(c.split) }}</template>
           <template v-if="c.startDate"> · {{ shortDate(c.startDate) }} → {{ shortDate(c.endDate) }}</template>
         </span>
         <span class="comp-progress">
@@ -73,6 +73,7 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
 import { leagueColor } from '../leagueColors'
 import { SPLITS, splitLabel } from '../formats'
+import { regionLabel } from '../regions'
 
 const route = useRoute()
 const router = useRouter()

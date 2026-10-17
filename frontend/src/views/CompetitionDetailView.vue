@@ -9,7 +9,7 @@
       <h1>{{ competition?.name ?? '...' }}</h1>
       <p v-if="competition" class="hero-sub">
         {{ competition.type === 'REGIONAL_LEAGUE' ? 'Ligue régionale' : 'Événement international' }}
-        <template v-if="competition.region"> · {{ competition.region }}</template>
+        <template v-if="competition.region"> · {{ regionLabel(competition.region) }}</template>
         · Saison {{ competition.season }}<template v-if="competition.split"> · Split {{ splitLabel(competition.split) }}</template>
       </p>
     </div>
@@ -228,6 +228,7 @@ import StandingsTable from '../components/StandingsTable.vue'
 import HeadToHeadTable from '../components/HeadToHeadTable.vue'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
 import { leagueColor } from '../leagueColors'
+import { regionLabel } from '../regions'
 import { longDay } from '../format'
 import { canSave, kickoff, toEditForm, toMatchPayload } from '../matchEdit'
 import { useSort } from '../composables/useSort'

@@ -43,7 +43,7 @@
         <template v-else>
           <td class="code"><router-link :to="`/teams/${t.id}`">{{ t.code }}</router-link></td>
           <td class="name"><router-link :to="`/teams/${t.id}`">{{ t.name }}</router-link></td>
-          <td>{{ t.region }}</td>
+          <td><RegionBadge :region="t.region" fallback="" /></td>
           <td class="actions">
             <button type="button" class="btn-secondary" @click="startEdit(t)">Modifier</button>
           </td>
@@ -68,6 +68,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import api, { teamLogoUrl } from '../services/api'
 import { useSort } from '../composables/useSort'
+import { regionLabel } from '../regions'
+import RegionBadge from '../components/RegionBadge.vue'
 
 const teams = ref([])
 const loaded = ref(false)
@@ -77,7 +79,10 @@ const form = reactive({ code: '', name: '', region: '' })
 const editingId = ref(null)
 const editForm = reactive({ code: '', name: '', region: '' })
 
-const { toggleSort, sortArrow, sortList } = useSort('name', (team, field) => (team[field] ?? '').toString())
+// La region se trie sur son libelle normalise ("LEC" et "EMEA" ensemble, sous "Europe")
+const { toggleSort, sortArrow, sortList } = useSort('name', (team, field) =>
+  field === 'region' ? regionLabel(team.region) : (team[field] ?? '').toString()
+)
 
 const search = ref('')
 
@@ -89,7 +94,7 @@ function normalize(text) {
 const filteredTeams = computed(() => {
   const q = normalize(search.value.trim())
   if (!q) return teams.value
-  return teams.value.filter(t => [t.name, t.code, t.region].some(v => normalize(v).includes(q)))
+  return teams.value.filter(t => [t.name, t.code, t.region, regionLabel(t.region)].some(v => normalize(v).includes(q)))
 })
 
 const sortedTeams = computed(() => sortList(filteredTeams.value))
