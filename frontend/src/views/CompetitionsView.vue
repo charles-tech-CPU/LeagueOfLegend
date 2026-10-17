@@ -85,12 +85,36 @@ const error = ref('')
 // Saison choisie dans l'URL (?season=2013), la plus recente par defaut.
 const season = computed(() => Number(route.query.season) || seasons.value[0]?.season || null)
 
+// Date du jour au format ISO local (les dates de competition sont des "YYYY-MM-DD")
+function todayIso() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * En cours : ses dates englobent aujourd'hui ; sans dates, commencee mais pas terminee
+ * (une partie seulement des matchs joues).
+ */
+function isOngoing(c) {
+  if (c.startDate && c.endDate) {
+    const today = todayIso()
+    return c.startDate <= today && today <= c.endDate
+  }
+  return c.matchCount > 0 && c.playedCount > 0 && c.playedCount < c.matchCount
+}
+
+// Les competitions en cours remontent en tete, dans leur propre section
 const sections = computed(() => {
-  const regional = competitions.value.filter(c => c.type === 'REGIONAL_LEAGUE')
+  const ongoing = competitions.value
+    .filter(isOngoing)
+    .sort((a, b) => (a.endDate ?? '').localeCompare(b.endDate ?? '') || a.name.localeCompare(b.name))
+  const others = competitions.value.filter(c => !isOngoing(c))
+  const regional = others.filter(c => c.type === 'REGIONAL_LEAGUE')
   return [
+    { key: 'ongoing', label: 'En cours', items: ongoing },
     ...SPLITS.map(s => ({ key: s.key, label: `Split ${s.label}`, items: regional.filter(c => c.split === s.key) })),
     { key: 'regional', label: 'Autres compétitions régionales', items: regional.filter(c => !c.split) },
-    { key: 'international', label: 'Événements internationaux', items: competitions.value.filter(c => c.type !== 'REGIONAL_LEAGUE') }
+    { key: 'international', label: 'Événements internationaux', items: others.filter(c => c.type !== 'REGIONAL_LEAGUE') }
   ]
 })
 
@@ -99,6 +123,7 @@ function percent(c) {
 }
 
 function statusOf(c) {
+  if (isOngoing(c)) return { label: 'En cours', tone: 'live' }
   if (!c.matchCount || c.playedCount === 0) return { label: 'À venir', tone: 'soon' }
   if (c.playedCount === c.matchCount) return { label: 'Terminé', tone: 'done' }
   return { label: 'En cours', tone: 'live' }
