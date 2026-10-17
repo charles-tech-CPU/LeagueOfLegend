@@ -17,7 +17,8 @@
     </router-link>
   </nav>
 
-  <div v-if="rows.length" class="region-filter" role="group" aria-label="Filtrer par région">
+  <fieldset v-if="rows.length" class="region-filter">
+    <legend class="sr-only">Filtrer par région</legend>
     <button type="button" :class="{ active: region === null }" @click="region = null">Toutes les régions</button>
     <button
       v-for="r in regions"
@@ -29,7 +30,7 @@
     >
       {{ r.label }} <span class="region-count">{{ r.count }}</span>
     </button>
-  </div>
+  </fieldset>
 
   <div v-if="rows.length" class="filters">
     <input v-model="search" type="search" placeholder="Rechercher une équipe" aria-label="Rechercher une équipe" />
@@ -119,6 +120,12 @@
         elle a joué le plus de séries). Dans une ligue, les équipes s'échangent des points entre elles : le niveau
         moyen de la ligue reste donc sa note de départ, que seuls les résultats internationaux corrigent.
         <table class="coefficients">
+          <thead>
+            <tr>
+              <th class="num">Note de départ</th>
+              <th>Ligues</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="t in LEAGUE_TIERS" :key="t.rating">
               <td class="num"><strong>{{ t.rating }}</strong></td>
@@ -308,7 +315,18 @@ watch(season, () => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 12px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .region-filter button {
   padding: 5px 12px;

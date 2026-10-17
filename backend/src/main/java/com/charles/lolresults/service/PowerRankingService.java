@@ -199,14 +199,22 @@ public class PowerRankingService {
             int s1 = m.getScore1();
             int s2 = m.getScore2();
             double expectedA = 1 / (1 + Math.pow(10, (b.rating - a.rating) / 400));
-            double resultA = s1 > s2 ? 1 : s1 < s2 ? 0 : 0.5;
+            double resultA = seriesResult(s1, s2);
             double delta = k(m, Math.abs(s1 - s2)) * (resultA - expectedA);
             int ratingA = (int) Math.round(a.rating);
             int ratingB = (int) Math.round(b.rating);
-            a.record(m, s1, s2, delta, b.team, ratingB);
-            b.record(m, s2, s1, -delta, a.team, ratingA);
+            a.addSeries(m, s1, s2, delta, b.team, ratingB);
+            b.addSeries(m, s2, s1, -delta, a.team, ratingA);
         }
         return ratings;
+    }
+
+    /** Resultat Elo d'une serie pour l'equipe 1 : 1 victoire, 0 defaite, 0,5 nul (BO2). */
+    private static double seriesResult(int score1, int score2) {
+        if (score1 == score2) {
+            return 0.5;
+        }
+        return score1 > score2 ? 1 : 0;
     }
 
     /** Poids d'une serie : format, ecart de manches, evenement majeur. */
@@ -264,7 +272,7 @@ public class PowerRankingService {
             this.rating = initial;
         }
 
-        void record(Match m, int own, int other, double delta, Team opponent, int opponentRating) {
+        void addSeries(Match m, int own, int other, double delta, Team opponent, int opponentRating) {
             rating += delta;
             gamesWon += own;
             gamesLost += other;
